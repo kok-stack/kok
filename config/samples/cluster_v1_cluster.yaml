@@ -1,7 +1,29 @@
-apiVersion: cluster.tanx.kok/v1
+apiVersion: cluster.kok.tanx/v1
 kind: Cluster
 metadata:
-  name: cluster-sample
+  name: test
+  namespace: test
 spec:
-  # Add fields here
-  foo: bar
+  clusterVersion: 1.18.4
+  clusterCidr: 10.0.0.0/8
+  clusterDnsAddr: 10.96.0.2
+  serviceClusterIpRange: 10.96.0.0/12
+  access:
+    address: 1.1.1.1
+    port: "8899"
+  init:
+    image: ccr.ccs.tencentyun.com/k8s-test/init:v1
+  etcd:
+    image: registry.aliyuncs.com/google_containers/etcd:3.3.10
+  apiServer:
+    image: registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.4
+  controllerManager:
+    image: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.4
+  scheduler:
+    image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4
+  client:
+    image: ccr.ccs.tencentyun.com/k8s-test/init:v1
+  kubelet:
+    podInfraContainerImage: registry.aliyuncs.com/google_containers/pause:3.1
+  kubeProxy:
+    bindAddress: "0.0.0.0"

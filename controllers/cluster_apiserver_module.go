@@ -1,0 +1,167 @@
+package controllers
+
+import (
+	"fmt"
+	tanxv1 "github.com/tangxusc/kok/api/v1"
+	v12 "k8s.io/api/apps/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+var apiServerModule = ParentModule{
+	Sub: []Module{apiServerDept, apiServerSvc},
+}
+
+var apiServerDept = &SubModule{
+	getObj: func() Object {
+		return &v12.Deployment{}
+	},
+	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+		var rep int32 = 1
+		name := fmt.Sprintf("%s-apiserver", c.Name)
+		var out = &v12.Deployment{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: c.Namespace,
+			},
+			Spec: v12.DeploymentSpec{
+				Replicas: &rep,
+				Template: v1.PodTemplateSpec{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      name,
+						Namespace: c.Namespace,
+						Labels: map[string]string{
+							"cluster": c.Name,
+							"app":     name,
+						},
+					},
+					Spec: v1.PodSpec{
+						Containers: []v1.Container{
+							{
+								Name:  "apiserver",
+								Image: c.Spec.ApiServerSpec.Image,
+								Command: []string{
+									"kube-apiserver",
+									"--allow-privileged=true",
+									"--authorization-mode=Node,RBAC",
+									"--client-ca-file=/pki/ca/ca.pem",
+									"--enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,StorageObjectInUseProtection,PersistentVolumeClaimResize,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,RuntimeClass,ResourceQuota",
+									"--etcd-cafile=/pki/ca/ca.pem",
+									"--etcd-certfile=/pki/etcd/etcd.pem",
+									"--etcd-keyfile=/pki/etcd/etcd-key.pem",
+									fmt.Sprintf("--etcd-servers=http://%s:2379", c.Status.Etcd.SvcName),
+									"--insecure-port=0",
+									"--kubelet-client-certificate=/pki/client/kubernetes-node.pem",
+									"--kubelet-client-key=/pki/client/kubernetes-node-key.pem",
+									"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
+									"--secure-port=6443",
+									"--service-cluster-ip-range=10.96.0.0/12",
+									"--tls-cert-file=/pki/server/kubernetes-server.pem",
+									"--tls-private-key-file=/pki/server/kubernetes-server-key.pem",
+								},
+								//Env: []v1.EnvVar{
+								//	{
+								//		Name:  "ETCD_ADDRESS",
+								//		Value: c.Status.Etcd.SvcName,
+								//	},
+								//},
+								Ports: []v1.ContainerPort{{
+									Name:          "https-6443",
+									ContainerPort: 6443,
+								}},
+								VolumeMounts: []v1.VolumeMount{
+									{
+										Name:      "ca-pki",
+										ReadOnly:  true,
+										MountPath: "/pki/ca",
+									},
+									{
+										Name:      "etcd-pki",
+										ReadOnly:  true,
+										MountPath: "/pki/etcd",
+									},
+									{
+										Name:      "k8s-server",
+										ReadOnly:  true,
+										MountPath: "/pki/server",
+									},
+									{
+										Name:      "k8s-client",
+										ReadOnly:  true,
+										MountPath: "/pki/client",
+									},
+								},
+							},
+						},
+						Volumes: []v1.Volume{{
+							Name: "ca-pki",
+							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+								SecretName: c.Status.Init.CaPkiName,
+							}},
+						}, {
+							Name: "etcd-pki",
+							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+								SecretName: c.Status.Init.EtcdPkiName,
+							}},
+						}, {
+							Name: "k8s-server",
+							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+								SecretName: c.Status.Init.ServerName,
+							}},
+						}, {
+							Name: "k8s-client",
+							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
+								SecretName: c.Status.Init.ClientName,
+							}},
+						},
+						},
+					},
+				},
+				Selector: &metav1.LabelSelector{
+					MatchLabels: map[string]string{
+						"cluster": c.Name,
+						"app":     name,
+					},
+				},
+			},
+		}
+		return out
+	},
+	updateStatus: func(c *tanxv1.Cluster, object Object) {
+		dept := object.(*v12.Deployment)
+		c.Status.ApiServer.Status = dept.Status
+		c.Status.ApiServer.Name = dept.Name
+	},
+}
+
+var apiServerSvc = &SubModule{
+	getObj: func() Object {
+		return &v1.Service{}
+	},
+	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+		name := fmt.Sprintf("%s-apiserver", c.Name)
+		out := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      name,
+				Namespace: c.Namespace,
+			},
+			Spec: v1.ServiceSpec{
+				Selector: map[string]string{
+					"cluster": c.Name,
+					"app":     name,
+				},
+				Ports: []v1.ServicePort{
+					{
+						Name: "https-6443",
+						Port: 6443,
+					},
+				},
+			},
+		}
+		return out
+	},
+	updateStatus: func(c *tanxv1.Cluster, object Object) {
+		svc := object.(*v1.Service)
+		c.Status.ApiServer.SvcName = svc.Name
+	},
+}

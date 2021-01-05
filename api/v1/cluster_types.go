@@ -17,25 +17,128 @@ limitations under the License.
 package v1
 
 import (
+	appsv1 "k8s.io/api/apps/v1"
+	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ImageBase struct {
+	Image string `json:"image"`
+}
+
+type ClusterAccessSpec struct {
+	Address string `json:"address"`
+	Port    string `json:"port"`
+}
+
+type ClusterInitSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterEtcdSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterApiServerSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterControllerManagerSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterSchedulerSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterClientSpec struct {
+	ImageBase `json:",inline"`
+}
+
+type ClusterKubeletSpec struct {
+	PodInfraContainerImage string `json:"podInfraContainerImage"`
+}
+
+type ClusterKubeProxySpec struct {
+	BindAddress string `json:"bindAddress,omitempty"`
+}
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	ClusterVersion        string                       `json:"clusterVersion"`
+	ClusterCIDR           string                       `json:"clusterCidr"`
+	ClusterDNSAddr        string                       `json:"clusterDnsAddr"`
+	ServiceClusterIpRange string                       `json:"serviceClusterIpRange"`
+	AccessSpec            ClusterAccessSpec            `json:"access"`
+	InitSpec              ClusterInitSpec              `json:"init,omitempty"`
+	EtcdSpec              ClusterEtcdSpec              `json:"etcd,omitempty"`
+	ApiServerSpec         ClusterApiServerSpec         `json:"apiServer,omitempty"`
+	ControllerManagerSpec ClusterControllerManagerSpec `json:"controllerManager,omitempty"`
+	SchedulerSpec         ClusterSchedulerSpec         `json:"scheduler,omitempty"`
+	ClientSpec            ClusterClientSpec            `json:"client,omitempty"`
+	KubeletSpec           ClusterKubeletSpec           `json:"kubelet,omitempty"`
+	KubeProxySpec         ClusterKubeProxySpec         `json:"kubeProxy,omitempty"`
+}
 
-	// Foo is an example field of Cluster. Edit Cluster_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+type ClusterInitStatus struct {
+	Name               string            `json:"name,omitempty"`
+	CaPkiName          string            `json:"caPkiName,omitempty"`
+	EtcdPkiName        string            `json:"etcdPkiName,omitempty"`
+	ServerName         string            `json:"serverName,omitempty"`
+	ClientName         string            `json:"clientName,omitempty"`
+	AdminConfigName    string            `json:"adminConfigName,omitempty"`
+	NodeConfigName     string            `json:"nodeConfigName,omitempty"`
+	ServiceAccountName string            `json:"serviceAccountName,omitempty"`
+	RoleBindingName    string            `json:"roleBindingName,omitempty"`
+	Status             batchv1.JobStatus `json:"status,omitempty"`
+}
+
+type ClusterEtcdStatus struct {
+	Name    string                  `json:"name,omitempty"`
+	SvcName string                  `json:"svcName,omitempty"`
+	Status  appsv1.DeploymentStatus `json:"status,omitempty"`
+}
+
+type ClusterApiServerStatus struct {
+	Name    string                  `json:"name,omitempty"`
+	SvcName string                  `json:"svcName,omitempty"`
+	Status  appsv1.DeploymentStatus `json:"status,omitempty"`
+}
+
+type ClusterControllerManagerStatus struct {
+	Name   string                  `json:"name,omitempty"`
+	Status appsv1.DeploymentStatus `json:"status,omitempty"`
+}
+
+type CLusterSchedulerStatus struct {
+	Name   string                  `json:"name,omitempty"`
+	Status appsv1.DeploymentStatus `json:"status,omitempty"`
+}
+
+type ClusterClientStatus struct {
+	Name   string                  `json:"name,omitempty"`
+	Status appsv1.DeploymentStatus `json:"status,omitempty"`
+}
+
+type ClusterPostInstallStatus struct {
+	Name   string            `json:"name,omitempty"`
+	Status batchv1.JobStatus `json:"status,omitempty"`
 }
 
 // ClusterStatus defines the observed state of Cluster
 type ClusterStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	Init              ClusterInitStatus              `json:"init,omitempty"`
+	Etcd              ClusterEtcdStatus              `json:"etcd,omitempty"`
+	ApiServer         ClusterApiServerStatus         `json:"apiServer,omitempty"`
+	ControllerManager ClusterControllerManagerStatus `json:"controllerManager,omitempty"`
+	Scheduler         CLusterSchedulerStatus         `json:"scheduler,omitempty"`
+	Client            ClusterClientStatus            `json:"client,omitempty"`
+	PostInstall       ClusterPostInstallStatus       `json:"postInstall,omitempty"`
 }
 
 // +kubebuilder:object:root=true
