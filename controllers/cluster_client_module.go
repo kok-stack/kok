@@ -18,7 +18,7 @@ var clientDept = &SubModule{
 	},
 	render: func(c *tanxv1.Cluster, s *SubModule) Object {
 		var rep int32 = 1
-		var termination int64 = 5
+		var termination int64 = 1
 		name := fmt.Sprintf("%s-client", c.Name)
 		var out = &v12.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
