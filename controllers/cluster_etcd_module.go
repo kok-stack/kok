@@ -17,6 +17,7 @@ var etcdDept = &SubModule{
 		return &v12.Deployment{}
 	},
 	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+		//TODO:后续使用etcd-operator
 		var rep int32 = 1
 		name := fmt.Sprintf("%s-etcd", c.Name)
 		var out = &v12.Deployment{

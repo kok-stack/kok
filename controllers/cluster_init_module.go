@@ -1,12 +1,15 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
 	tanxv1 "github.com/tangxusc/kok/api/v1"
 	v1 "k8s.io/api/batch/v1"
 	v12 "k8s.io/api/core/v1"
 	v13 "k8s.io/api/rbac/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var initModule = ParentModule{
@@ -25,7 +28,6 @@ var InitJob = &SubModule{
 			"cluster": c.Name,
 			"app":     out.Name,
 		}
-		//out.SetFinalizers([]string{FinalizerName})
 		out.Spec = v1.JobSpec{
 			Template: v12.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
@@ -48,22 +50,22 @@ var InitJob = &SubModule{
 							Value: c.Spec.AccessSpec.Port,
 						}, {
 							Name:  "CA_PKI_NAME",
-							Value: fmt.Sprintf("%s-ca-pki", c.Name),
+							Value: getCAPkiName(c),
 						}, {
 							Name:  "ETCD_PKI_NAME",
-							Value: fmt.Sprintf("%s-etcd-pki", c.Name),
+							Value: getEtcdPkiName(c),
 						}, {
 							Name:  "K8S_SERVER_NAME",
-							Value: fmt.Sprintf("%s-k8s-server", c.Name),
+							Value: getServerName(c),
 						}, {
 							Name:  "K8S_CLIENT_NAME",
-							Value: fmt.Sprintf("%s-k8s-client", c.Name),
+							Value: getClientName(c),
 						}, {
 							Name:  "ADMIN_CONFIG_NAME",
-							Value: fmt.Sprintf("%s-admin-config", c.Name),
+							Value: getAdminConfigName(c),
 						}, {
 							Name:  "NODE_CONFIG_NAME",
-							Value: fmt.Sprintf("%s-node-config", c.Name),
+							Value: getNodeConfigName(c),
 						}},
 					}},
 					RestartPolicy:      v12.RestartPolicyNever,
@@ -105,6 +107,46 @@ var InitJob = &SubModule{
 			}
 		}
 	},
+	delete: func(ctx context.Context, c *tanxv1.Cluster, client client.Client) error {
+		var err error
+		nameFunc := []func(cluster *tanxv1.Cluster) string{getCAPkiName, getEtcdPkiName, getServerName, getClientName, getNodeConfigName, getAdminConfigName}
+		for _, namef := range nameFunc {
+			err = client.Delete(ctx, &v12.Secret{
+				ObjectMeta: metav1.ObjectMeta{Name: namef(c), Namespace: c.Namespace},
+			})
+			if err != nil && errors.IsNotFound(err) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+		}
+		return err
+	},
+}
+
+func getCAPkiName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-ca-pki", c.Name)
+}
+
+func getEtcdPkiName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd-pki", c.Name)
+}
+
+func getServerName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-k8s-server", c.Name)
+}
+
+func getClientName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-k8s-client", c.Name)
+}
+
+func getNodeConfigName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-node-config", c.Name)
+}
+
+func getAdminConfigName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-admin-config", c.Name)
 }
 
 var InitServiceAccount = &SubModule{

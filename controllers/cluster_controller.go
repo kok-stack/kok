@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -48,7 +49,6 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	}
 	//https://book.kubebuilder.io/reference/using-finalizers.html
 	if !cs.ObjectMeta.DeletionTimestamp.IsZero() {
-		//删除
 		return Delete(ctx, cs, rl, r, r.Scheme)
 	}
 
@@ -60,27 +60,46 @@ func Delete(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("not support version %s", c.Spec.ClusterVersion)
 	}
-
-	for _, module := range modules {
-		if err := module.Init(ctx, c, r, rl, scheme); err != nil {
+	total := len(modules)
+	for index, module := range modules {
+		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
+		moduleInst := module.copy()
+		rl.Info(moduleString, "moduleInst", moduleInst)
+		if err := moduleInst.Init(ctx, c, r, rl, scheme); err != nil {
 			return ctrl.Result{}, err
 		}
-		//TODO:会丢status信息吗?
-		if err := module.RemoveFinalizer(); err != nil {
+		rl.Info(moduleString + "module delete")
+		if err := moduleInst.Delete(); err != nil {
+			rl.Info(moduleString+"module delete error", "error", err)
 			return ctrl.Result{}, err
 		}
+		rl.Info(moduleString + "module delete success")
 	}
+
+	c.SetFinalizers([]string{})
+	rl.Info("remove Finalizers...")
+	if err := r.Update(ctx, c); err != nil {
+		rl.Info("remove Finalizers error", "error", err)
+		return ctrl.Result{}, err
+	}
+	rl.Info("delete cluster finish", "name", c.Name, "namespace", c.Namespace)
+
 	return ctrl.Result{}, nil
 }
+
+var retryDuration = time.Second * 1
 
 func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
 	modules, ok := VersionsModules[c.Spec.ClusterVersion]
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("not support version %s", c.Spec.ClusterVersion)
 	}
-	fmt.Println("-------------------")
-	for _, module := range modules {
+	rl.Info("Cluster Reconcile", "version", c.Spec.ClusterVersion, "name", c.Name, "namespace", c.Namespace)
+	total := len(modules)
+	for index, module := range modules {
 		moduleInst := module.copy()
+		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
+		rl.Info(moduleString, "moduleInst", moduleInst)
 		if err := moduleInst.Init(ctx, c, r, rl, scheme); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -88,30 +107,48 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r clie
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		fmt.Println("exist:", exist)
+		rl.Info(moduleString+"check module exist", "exist", exist)
 		if !exist {
+			rl.Info(moduleString + "module not exist,creating...")
 			if err = moduleInst.Create(); err != nil {
-				fmt.Println("moduleInst.Create():", err)
-				return ctrl.Result{}, err
+				rl.Info(moduleString+"module not exist,create error", "error", err)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: retryDuration,
+				}, err
+			}
+			return ctrl.Result{
+				RequeueAfter: retryDuration,
+			}, err
+		} else {
+			rl.Info(moduleString + "module exist,update status...")
+			if err = moduleInst.StatusUpdate(); err != nil {
+				rl.Info(moduleString+"module exist,update status error", "error", err)
+				return ctrl.Result{
+					Requeue:      true,
+					RequeueAfter: retryDuration,
+				}, err
 			}
 		}
-		if err = moduleInst.StatusUpdate(); err != nil {
-			fmt.Println("moduleInst.StatusUpdate():", err)
-			return ctrl.Result{}, err
-		}
-		fmt.Println("for循环结束")
 	}
-	fmt.Println("----3333333333333---------------")
+	rl.Info("update Cluster(crd) status")
+	if len(c.GetFinalizers()) == 0 {
+		c.SetFinalizers([]string{FinalizerName})
+	}
 	if err := r.Update(ctx, c); err != nil {
-		return ctrl.Result{}, err
+		rl.Info("update Cluster(crd) status error", "error", err)
+		return ctrl.Result{
+			Requeue:      true,
+			RequeueAfter: retryDuration,
+		}, err
 	}
+	rl.Info("End Cluster Reconcile", "version", c.Spec.ClusterVersion)
 
 	return ctrl.Result{}, nil
 }
 
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	//TODO:监听owner为Cluster的
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1.Cluster{}).Owns(&clusterv1.Cluster{}).
+	return ctrl.NewControllerManagedBy(mgr).Owns(&clusterv1.Cluster{}).
+		For(&clusterv1.Cluster{}).
 		Complete(r)
 }

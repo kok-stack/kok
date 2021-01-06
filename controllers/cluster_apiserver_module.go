@@ -17,6 +17,7 @@ var apiServerDept = &SubModule{
 		return &v12.Deployment{}
 	},
 	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+		//TODO:定制Replicas数量
 		var rep int32 = 1
 		name := fmt.Sprintf("%s-apiserver", c.Name)
 		var out = &v12.Deployment{
@@ -55,16 +56,10 @@ var apiServerDept = &SubModule{
 									"--kubelet-client-key=/pki/client/kubernetes-node-key.pem",
 									"--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname",
 									"--secure-port=6443",
-									"--service-cluster-ip-range=10.96.0.0/12",
+									fmt.Sprintf("--service-cluster-ip-range=%s", c.Spec.ServiceClusterIpRange),
 									"--tls-cert-file=/pki/server/kubernetes-server.pem",
 									"--tls-private-key-file=/pki/server/kubernetes-server-key.pem",
 								},
-								//Env: []v1.EnvVar{
-								//	{
-								//		Name:  "ETCD_ADDRESS",
-								//		Value: c.Status.Etcd.SvcName,
-								//	},
-								//},
 								Ports: []v1.ContainerPort{{
 									Name:          "https-6443",
 									ContainerPort: 6443,

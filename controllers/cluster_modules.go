@@ -12,8 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-//const FinalizerName = "finalizer.cluster.kok.tanx"
-const FinalizerName = "tanx"
+const FinalizerName = "finalizer.cluster.kok.tanx"
 
 type Object interface {
 	runtime.Object
@@ -26,7 +25,7 @@ type Module interface {
 	Exist() (bool, error)
 	Create() error
 	StatusUpdate() error
-	RemoveFinalizer() error
+	Delete() error
 }
 
 var modules = []ParentModule{initModule, etcdModule, apiServerModule}
@@ -47,9 +46,9 @@ func (i ParentModule) copy() Module {
 	return &i
 }
 
-func (i *ParentModule) RemoveFinalizer() error {
+func (i *ParentModule) Delete() error {
 	for _, module := range i.Sub {
-		if err := module.RemoveFinalizer(); err != nil {
+		if err := module.Delete(); err != nil {
 			return err
 		}
 	}
@@ -114,11 +113,17 @@ type SubModule struct {
 	getObj       func() Object
 	render       func(c *v1.Cluster, s *SubModule) Object
 	updateStatus func(c *v1.Cluster, object Object)
+	//delete not set owner obj
+	delete func(ctx context.Context, c *v1.Cluster, client client.Client) error
 }
 
-func (s *SubModule) RemoveFinalizer() error {
-	s.target.SetFinalizers([]string{})
-	return s.Client.Update(s, s.target)
+func (s *SubModule) Delete() error {
+	if s.delete != nil {
+		err := s.delete(s, s.c, s.Client)
+		s.Logger.Info("call subModule custom delete result", "error", err)
+		return err
+	}
+	return nil
 }
 
 func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) error {
@@ -147,8 +152,6 @@ func (s *SubModule) Exist() (bool, error) {
 }
 
 func (s *SubModule) Create() error {
-	//todo:设置SetFinalizers
-	//s.target.SetFinalizers([]string{FinalizerName})
 	if err := controllerutil.SetControllerReference(s.c, s.target, s.Scheme); err != nil {
 		return err
 	}
