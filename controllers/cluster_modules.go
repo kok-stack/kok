@@ -28,7 +28,7 @@ type Module interface {
 	Delete() error
 }
 
-var modules = []ParentModule{initModule, etcdModule, apiServerModule}
+var modules = []ParentModule{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule, installPostModule}
 var VersionsModules = map[string][]ParentModule{
 	"1.18.4": modules,
 }

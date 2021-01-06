@@ -41,7 +41,7 @@ var InitJob = &SubModule{
 						Command: []string{"sh", "/home/init.sh"},
 						Env: []v12.EnvVar{{
 							Name:  "APISERVER_ADDRESS",
-							Value: "apiserver",
+							Value: fmt.Sprintf("%s-apiserver", c.Name),
 						}, {
 							Name:  "FRONT_APISERVER_ADDRESS",
 							Value: c.Spec.AccessSpec.Address,
