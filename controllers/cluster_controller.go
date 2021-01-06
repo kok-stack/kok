@@ -65,9 +65,7 @@ func Delete(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.
 		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
 		moduleInst := module.copy()
 		rl.Info(moduleString, "moduleInst", moduleInst)
-		if err := moduleInst.Init(ctx, c, r, rl, scheme); err != nil {
-			return ctrl.Result{}, err
-		}
+		moduleInst.Init(ctx, c, r, rl, scheme)
 		rl.Info(moduleString + "module delete")
 		if err := moduleInst.Delete(); err != nil {
 			rl.Info(moduleString+"module delete error", "error", err)
@@ -100,9 +98,7 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r clie
 		moduleInst := module.copy()
 		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
 		rl.Info(moduleString, "moduleInst", moduleInst)
-		if err := moduleInst.Init(ctx, c, r, rl, scheme); err != nil {
-			return ctrl.Result{}, err
-		}
+		moduleInst.Init(ctx, c, r, rl, scheme)
 		exist, err := moduleInst.Exist()
 		if err != nil {
 			return ctrl.Result{}, err

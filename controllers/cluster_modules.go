@@ -21,7 +21,7 @@ type Object interface {
 }
 
 type Module interface {
-	Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) error
+	Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme)
 	Exist() (bool, error)
 	Create() error
 	StatusUpdate() error
@@ -55,18 +55,15 @@ func (i *ParentModule) Delete() error {
 	return nil
 }
 
-func (i *ParentModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) error {
+func (i *ParentModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) {
 	i.Context = ctx
 	i.c = c
 	i.Client = r
 	i.Logger = rl
 	i.Scheme = scheme
 	for _, module := range i.Sub {
-		if err := module.Init(ctx, c, r, rl, scheme); err != nil {
-			return err
-		}
+		module.Init(ctx, c, r, rl, scheme)
 	}
-	return nil
 }
 
 func (i *ParentModule) Exist() (bool, error) {
@@ -126,7 +123,7 @@ func (s *SubModule) Delete() error {
 	return nil
 }
 
-func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) error {
+func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) {
 	s.Context = ctx
 	s.c = c
 	s.Client = r
@@ -134,7 +131,6 @@ func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl
 	s.Scheme = scheme
 
 	s.target = s.render(s.c, s)
-	return nil
 }
 
 func (s *SubModule) Exist() (bool, error) {
