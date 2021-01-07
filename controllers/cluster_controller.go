@@ -156,6 +156,6 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *Clu
 
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1.Cluster{}).Owns(&v1.Deployment{}).Owns(&v12.Job{}).
+		For(&clusterv1.Cluster{}).Owns(&v1.Deployment{}).Owns(&v12.Job{}).Owns(&v13.Service{}).
 		Complete(r)
 }
