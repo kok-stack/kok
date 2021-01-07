@@ -8,6 +8,31 @@ metadata:
   creationTimestamp: null
   name: clusters.cluster.kok.tanx
 spec:
+  additionalPrinterColumns:
+  - JSONPath: .spec.clusterVersion
+    description: clusterVersion
+    name: version
+    type: string
+  - JSONPath: .spec.clusterCidr
+    description: clusterCidr
+    name: cluster-Cidr
+    type: string
+  - JSONPath: .spec.clusterDnsAddr
+    description: clusterDnsAddr
+    name: cluster-Dns-Addr
+    type: string
+  - JSONPath: .spec.serviceClusterIpRange
+    description: serviceClusterIpRange
+    name: service-Cluster-IpRange
+    type: string
+  - JSONPath: .spec.access.address
+    description: access-address
+    name: access-address
+    type: string
+  - JSONPath: .spec.access.port
+    description: access-port
+    name: access-port
+    type: string
   group: cluster.kok.tanx
   names:
     kind: Cluster
@@ -15,6 +40,7 @@ spec:
     plural: clusters
     singular: cluster
   scope: Namespaced
+  subresources: {}
   validation:
     openAPIV3Schema:
       description: Cluster is the Schema for the clusters API
