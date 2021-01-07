@@ -13,7 +13,8 @@ import (
 )
 
 var initModule = ParentModule{
-	Sub: []Module{InitServiceAccount, InitRoleBinding, InitJob},
+	Name: "init-job",
+	Sub:  []Module{InitServiceAccount, InitRoleBinding, InitJob},
 }
 
 var InitJob = &SubModule{

@@ -9,7 +9,8 @@ import (
 )
 
 var ctrMgtModule = ParentModule{
-	Sub: []Module{controllerMgrDept},
+	Name: "controllerManager-dept",
+	Sub:  []Module{controllerMgrDept},
 }
 
 var controllerMgrDept = &SubModule{

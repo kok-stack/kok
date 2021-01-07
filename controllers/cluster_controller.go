@@ -19,6 +19,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	v1 "k8s.io/api/apps/v1"
+	v12 "k8s.io/api/batch/v1"
+	v13 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/record"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -32,12 +36,14 @@ import (
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	Log      logr.Logger
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 // +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters/events,verbs=get;list;watch;create;update;patch
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	rl := r.Log.WithValues("cluster", req.NamespacedName)
@@ -47,27 +53,29 @@ func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	//https://book.kubebuilder.io/reference/using-finalizers.html
 	if !cs.ObjectMeta.DeletionTimestamp.IsZero() {
-		return Delete(ctx, cs, rl, r, r.Scheme)
+		return Delete(ctx, cs, rl, r)
 	}
 
-	return Reconcile(ctx, cs, rl, r, r.Scheme)
+	return Reconcile(ctx, cs, rl, r)
 }
 
-func Delete(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
+func Delete(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *ClusterReconciler) (ctrl.Result, error) {
 	modules, ok := VersionsModules[c.Spec.ClusterVersion]
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("not support version %s", c.Spec.ClusterVersion)
 	}
 	total := len(modules)
 	for index, module := range modules {
-		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
+		moduleName := module.Name
+		moduleString := fmt.Sprintf("[%v/%v]%s", index+1, total, moduleName)
 		moduleInst := module.copy()
 		rl.Info(moduleString, "moduleInst", moduleInst)
-		moduleInst.Init(ctx, c, r, rl, scheme)
+		moduleInst.Init(ctx, c, r, rl)
 		rl.Info(moduleString + "module delete")
+		r.Recorder.Event(c, v13.EventTypeNormal, "ModuleDeleting", fmt.Sprintf("[%s] Creating", moduleName))
 		if err := moduleInst.Delete(); err != nil {
+			r.Recorder.Event(c, v13.EventTypeWarning, "ModuleDeleteError", fmt.Sprintf("[%s] Error:%v", moduleName, err))
 			rl.Info(moduleString+"module delete error", "error", err)
 			return ctrl.Result{}, err
 		}
@@ -87,7 +95,7 @@ func Delete(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.
 
 var retryDuration = time.Second * 1
 
-func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r client.Client, scheme *runtime.Scheme) (ctrl.Result, error) {
+func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *ClusterReconciler) (ctrl.Result, error) {
 	modules, ok := VersionsModules[c.Spec.ClusterVersion]
 	if !ok {
 		return ctrl.Result{}, fmt.Errorf("not support version %s", c.Spec.ClusterVersion)
@@ -95,10 +103,11 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r clie
 	rl.Info("Cluster Reconcile", "version", c.Spec.ClusterVersion, "name", c.Name, "namespace", c.Namespace)
 	total := len(modules)
 	for index, module := range modules {
+		moduleName := module.Name
+		moduleString := fmt.Sprintf("[%v/%v]%s ", index+1, total, moduleName)
 		moduleInst := module.copy()
-		moduleString := fmt.Sprintf("[%v/%v]", index+1, total)
 		rl.Info(moduleString, "moduleInst", moduleInst)
-		moduleInst.Init(ctx, c, r, rl, scheme)
+		moduleInst.Init(ctx, c, r, rl)
 		exist, err := moduleInst.Exist()
 		if err != nil {
 			return ctrl.Result{}, err
@@ -106,19 +115,21 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r clie
 		rl.Info(moduleString+"check module exist", "exist", exist)
 		if !exist {
 			rl.Info(moduleString + "module not exist,creating...")
+			r.Recorder.Event(c, v13.EventTypeNormal, "ModuleCreating", fmt.Sprintf("[%s] Creating", moduleName))
 			if err = moduleInst.Create(); err != nil {
 				rl.Info(moduleString+"module not exist,create error", "error", err)
+				r.Recorder.Event(c, v13.EventTypeWarning, "ModuleCreateError", fmt.Sprintf("[%s] Error:%v", moduleName, err))
 				return ctrl.Result{
 					Requeue:      true,
 					RequeueAfter: retryDuration,
 				}, err
 			}
-			return ctrl.Result{
-				RequeueAfter: retryDuration,
-			}, err
+			return ctrl.Result{}, nil
 		} else {
+			r.Recorder.Event(c, v13.EventTypeNormal, "ModuleUpdating", fmt.Sprintf("[%s] Updating", moduleName))
 			rl.Info(moduleString + "module exist,update status...")
 			if err = moduleInst.StatusUpdate(); err != nil {
+				r.Recorder.Event(c, v13.EventTypeWarning, "ModuleUpdateError", fmt.Sprintf("[%s] Error:%v", moduleName, err))
 				rl.Info(moduleString+"module exist,update status error", "error", err)
 				return ctrl.Result{
 					Requeue:      true,
@@ -144,7 +155,7 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r clie
 }
 
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).Owns(&clusterv1.Cluster{}).
-		For(&clusterv1.Cluster{}).
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&clusterv1.Cluster{}).Owns(&v1.Deployment{}).Owns(&v12.Job{}).
 		Complete(r)
 }

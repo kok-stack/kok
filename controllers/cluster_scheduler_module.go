@@ -9,7 +9,8 @@ import (
 )
 
 var schedulerModule = ParentModule{
-	Sub: []Module{schedulerDept},
+	Name: "scheduler-dept",
+	Sub:  []Module{schedulerDept},
 }
 
 var schedulerDept = &SubModule{

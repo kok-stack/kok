@@ -9,7 +9,8 @@ import (
 )
 
 var etcdModule = ParentModule{
-	Sub: []Module{etcdDept, etcdSvc},
+	Name: "etcd-dept",
+	Sub:  []Module{etcdDept, etcdSvc},
 }
 
 var etcdDept = &SubModule{

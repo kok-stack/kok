@@ -9,7 +9,8 @@ import (
 )
 
 var clientModule = ParentModule{
-	Sub: []Module{clientDept},
+	Name: "client-dept",
+	Sub:  []Module{clientDept},
 }
 
 var clientDept = &SubModule{
@@ -46,7 +47,6 @@ var clientDept = &SubModule{
 									"cat",
 								},
 								Stdin: true,
-								//TTY: true,
 								VolumeMounts: []v1.VolumeMount{
 									{
 										Name:      "ca-pki",

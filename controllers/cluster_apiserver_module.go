@@ -9,7 +9,8 @@ import (
 )
 
 var apiServerModule = ParentModule{
-	Sub: []Module{apiServerDept, apiServerSvc},
+	Name: "apiserver-dept",
+	Sub:  []Module{apiServerDept, apiServerSvc},
 }
 
 var apiServerDept = &SubModule{

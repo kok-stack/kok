@@ -2,8 +2,10 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	v1 "github.com/tangxusc/kok/api/v1"
+	v12 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,7 +23,7 @@ type Object interface {
 }
 
 type Module interface {
-	Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme)
+	Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger)
 	Exist() (bool, error)
 	Create() error
 	StatusUpdate() error
@@ -34,12 +36,12 @@ var VersionsModules = map[string][]ParentModule{
 }
 
 type ParentModule struct {
+	Name string
 	context.Context
 	c *v1.Cluster
-	client.Client
 	logr.Logger
 	Sub []Module
-	*runtime.Scheme
+	r   *ClusterReconciler
 }
 
 func (i ParentModule) copy() Module {
@@ -55,14 +57,13 @@ func (i *ParentModule) Delete() error {
 	return nil
 }
 
-func (i *ParentModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) {
+func (i *ParentModule) Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger) {
 	i.Context = ctx
 	i.c = c
-	i.Client = r
 	i.Logger = rl
-	i.Scheme = scheme
+	i.r = r
 	for _, module := range i.Sub {
-		module.Init(ctx, c, r, rl, scheme)
+		module.Init(ctx, c, r, rl)
 	}
 }
 
@@ -102,10 +103,9 @@ func (i *ParentModule) StatusUpdate() error {
 type SubModule struct {
 	context.Context
 	c *v1.Cluster
-	client.Client
 	logr.Logger
-	*runtime.Scheme
 	target Object
+	r      *ClusterReconciler
 
 	getObj       func() Object
 	render       func(c *v1.Cluster, s *SubModule) Object
@@ -116,25 +116,24 @@ type SubModule struct {
 
 func (s *SubModule) Delete() error {
 	if s.delete != nil {
-		err := s.delete(s, s.c, s.Client)
+		err := s.delete(s, s.c, s.r.Client)
 		s.Logger.Info("call subModule custom delete result", "error", err)
 		return err
 	}
 	return nil
 }
 
-func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r client.Client, rl logr.Logger, scheme *runtime.Scheme) {
+func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger) {
 	s.Context = ctx
 	s.c = c
-	s.Client = r
+	s.r = r
 	s.Logger = rl
-	s.Scheme = scheme
 
 	s.target = s.render(s.c, s)
 }
 
 func (s *SubModule) Exist() (bool, error) {
-	err := s.Get(s, types.NamespacedName{
+	err := s.r.Get(s, types.NamespacedName{
 		Namespace: s.c.Namespace,
 		Name:      s.target.GetName(),
 	}, s.getObj())
@@ -148,19 +147,23 @@ func (s *SubModule) Exist() (bool, error) {
 }
 
 func (s *SubModule) Create() error {
-	if err := controllerutil.SetControllerReference(s.c, s.target, s.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(s.c, s.target, s.r.Scheme); err != nil {
 		return err
 	}
-	err := s.Client.Create(s, s.target)
-	if errors.IsAlreadyExists(err) {
+	s.r.Recorder.Event(s.c, v12.EventTypeNormal, "Creating", fmt.Sprintf("%s", s.target.GetName()))
+	err := s.r.Client.Create(s, s.target)
+	if err != nil && errors.IsAlreadyExists(err) {
 		return nil
+	}
+	if err != nil {
+		s.r.Recorder.Event(s.c, v12.EventTypeWarning, "CreateError", fmt.Sprintf("%s,error:%v", s.target.GetName(), err))
 	}
 	return err
 }
 
 func (s *SubModule) StatusUpdate() error {
 	out := s.getObj()
-	if err := s.Client.Get(s, client.ObjectKey{
+	if err := s.r.Client.Get(s, client.ObjectKey{
 		Namespace: s.c.Namespace,
 		Name:      s.target.GetName(),
 	}, out); err != nil {
