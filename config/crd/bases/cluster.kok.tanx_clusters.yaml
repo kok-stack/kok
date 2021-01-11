@@ -61,6 +61,7 @@ spec:
           description: ClusterSpec defines the desired state of Cluster
           properties:
             access:
+              description: TODO:image mirror
               properties:
                 address:
                   type: string
@@ -71,6 +72,7 @@ spec:
               - port
               type: object
             apiServer:
+              description: TODO:count
               properties:
                 image:
                   type: string
@@ -89,8 +91,10 @@ spec:
             clusterDnsAddr:
               type: string
             clusterVersion:
+              description: TODO:domain设置
               type: string
             controllerManager:
+              description: TODO:count
               properties:
                 image:
                   type: string
@@ -98,6 +102,7 @@ spec:
               - image
               type: object
             etcd:
+              description: TODO:count,etcdOperator
               properties:
                 image:
                   type: string
@@ -124,6 +129,7 @@ spec:
               - podInfraContainerImage
               type: object
             scheduler:
+              description: TODO:count
               properties:
                 image:
                   type: string

@@ -45,10 +45,10 @@ var InitJob = &SubModule{
 							Value: fmt.Sprintf("%s-apiserver", c.Name),
 						}, {
 							Name:  "FRONT_APISERVER_ADDRESS",
-							Value: c.Spec.AccessSpec.Address,
+							Value: fmt.Sprintf("%s-apiserver", c.Name),
 						}, {
 							Name:  "FRONT_APISERVER_PORT",
-							Value: c.Spec.AccessSpec.Port,
+							Value: "6443",
 						}, {
 							Name:  "CA_PKI_NAME",
 							Value: getCAPkiName(c),
