@@ -98,7 +98,7 @@ func main() {
 //const addonsDirName = "addons"
 const addonsDirName = "/mnt/d/code/kok/addons"
 
-var templateMaps = map[string]*template.Template{}
+var version2Addons = map[string]map[string]*template.Template{}
 
 func startAddonsDownloader(mgr manager.Manager) {
 	client := mgr.GetClient()
@@ -123,7 +123,7 @@ func startAddonsDownloader(mgr manager.Manager) {
 			panic(err)
 		}
 
-		t, ok := templateMaps[dir]
+		t, ok := version2Addons[cls.Spec.ClusterVersion][dir]
 		if !ok {
 			if _, err := ctx.Writer.WriteString("未找到文件模板,传入的dir可能存在错误"); err != nil {
 				panic(err)
@@ -199,12 +199,24 @@ func initTemplateMaps() error {
 		if !sub.IsDir() {
 			continue
 		}
-
-		t, err := template.ParseGlob(filepath.Join(addonsDirName, sub.Name()) + "/*")
+		join := filepath.Join(addonsDirName, sub.Name())
+		subDir, err := ioutil.ReadDir(join)
 		if err != nil {
 			return err
 		}
-		templateMaps[sub.Name()] = t
+		m := map[string]*template.Template{}
+		for _, info := range subDir {
+			if !info.IsDir() {
+				continue
+			}
+			t, err := template.ParseGlob(filepath.Join(join, info.Name()) + "/*")
+			if err != nil {
+				return err
+			}
+			m[info.Name()] = t
+		}
+
+		version2Addons[sub.Name()] = m
 	}
 	return nil
 }
