@@ -146,6 +146,7 @@ var apiServerSvc = &SubModule{
 					"cluster": c.Name,
 					"app":     name,
 				},
+				Type: v1.ServiceTypeNodePort,
 				Ports: []v1.ServicePort{
 					{
 						Name: "https-6443",

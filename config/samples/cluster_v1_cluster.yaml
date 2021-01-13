@@ -9,8 +9,8 @@ spec:
   clusterDnsAddr: 10.96.0.2
   serviceClusterIpRange: 10.96.0.0/12
   access:
-    address: 1.1.1.1
-    port: "8899"
+    address: "127.0.0.1"
+    port: "9999"
   init:
     image: ccr.ccs.tencentyun.com/k8s-test/init:v1
   etcd:
