@@ -9,6 +9,8 @@ import (
 	v13 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"math/big"
+	"net"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -50,6 +52,9 @@ var InitJob = &SubModule{
 							Name:  "FRONT_APISERVER_PORT",
 							Value: c.Spec.AccessSpec.Port,
 						}, {
+							Name:  "KUBE_SVC_ADDR",
+							Value: NextIpForRange(c.Spec.ServiceClusterIpRange, 1),
+						}, {
 							Name:  "CA_PKI_NAME",
 							Value: getCAPkiName(c),
 						}, {
@@ -74,12 +79,14 @@ var InitJob = &SubModule{
 				},
 			},
 		}
+
 		return out
 	},
 	updateStatus: func(c *tanxv1.Cluster, object Object) {
 		job := object.(*v1.Job)
 		c.Status.Init.Status = job.Status
 		c.Status.Init.Name = job.Name
+		c.Status.Init.DnsAddr = NextIpForRange(c.Spec.ServiceClusterIpRange, 2)
 		envs := job.Spec.Template.Spec.Containers[0].Env
 		for _, env := range envs {
 			if env.Name == "CA_PKI_NAME" {
@@ -124,6 +131,14 @@ var InitJob = &SubModule{
 		}
 		return err
 	},
+}
+
+func NextIpForRange(ipRange string, step int64) string {
+	ip, _, _ := net.ParseCIDR(ipRange)
+	ret := big.NewInt(0)
+	ret.SetBytes(ip.To4())
+	i := ret.Int64() + step
+	return fmt.Sprintf("%d.%d.%d.%d", byte(i>>24), byte(i>>16), byte(i>>8), byte(i))
 }
 
 func getCAPkiName(c *tanxv1.Cluster) string {

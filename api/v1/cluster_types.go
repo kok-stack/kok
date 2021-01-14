@@ -71,7 +71,6 @@ type ClusterSpec struct {
 	//TODO:domain设置
 	ClusterVersion        string `json:"clusterVersion"`
 	ClusterCIDR           string `json:"clusterCidr"`
-	ClusterDNSAddr        string `json:"clusterDnsAddr"`
 	ServiceClusterIpRange string `json:"serviceClusterIpRange"`
 	//TODO:image mirror
 	AccessSpec ClusterAccessSpec `json:"access"`
@@ -100,6 +99,7 @@ type ClusterInitStatus struct {
 	ServiceAccountName string            `json:"serviceAccountName,omitempty"`
 	RoleBindingName    string            `json:"roleBindingName,omitempty"`
 	Status             batchv1.JobStatus `json:"status,omitempty"`
+	DnsAddr            string            `json:"dnsAddr,omitempty"`
 }
 
 type ClusterEtcdStatus struct {

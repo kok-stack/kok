@@ -128,7 +128,7 @@ cat <<EOF >k8s-server-csr.json
         "kubernetes.default.svc",
         "kubernetes.default.svc.cluster",
         "kubernetes.default.svc.cluster.local",
-        "10.96.0.1",
+        "${KUBE_SVC_ADDR}",
         "${FRONT_APISERVER_ADDRESS}"
     ],
     "key": {

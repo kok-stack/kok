@@ -88,8 +88,6 @@ spec:
               type: object
             clusterCidr:
               type: string
-            clusterDnsAddr:
-              type: string
             clusterVersion:
               description: TODO:domain设置
               type: string
@@ -141,7 +139,6 @@ spec:
           required:
           - access
           - clusterCidr
-          - clusterDnsAddr
           - clusterVersion
           - serviceClusterIpRange
           type: object
@@ -494,6 +491,8 @@ spec:
                 caPkiName:
                   type: string
                 clientName:
+                  type: string
+                dnsAddr:
                   type: string
                 etcdPkiName:
                   type: string
