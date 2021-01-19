@@ -17,7 +17,7 @@ spec:
     description: clusterCidr
     name: cluster-Cidr
     type: string
-  - JSONPath: .spec.clusterDnsAddr
+  - JSONPath: .status.init.dnsAddr
     description: clusterDnsAddr
     name: cluster-Dns-Addr
     type: string
@@ -58,7 +58,8 @@ spec:
         metadata:
           type: object
         spec:
-          description: ClusterSpec defines the desired state of Cluster
+          description: 'TODO: 组件 就绪/存活探针 ClusterSpec defines the desired state of
+            Cluster'
           properties:
             access:
               properties:

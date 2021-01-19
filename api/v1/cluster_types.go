@@ -154,7 +154,7 @@ type ClusterStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:printcolumn:name="version",type="string",JSONPath=".spec.clusterVersion",description="clusterVersion"
 // +kubebuilder:printcolumn:name="cluster-Cidr",type="string",JSONPath=".spec.clusterCidr",description="clusterCidr"
-// +kubebuilder:printcolumn:name="cluster-Dns-Addr",type="string",JSONPath=".spec.clusterDnsAddr",description="clusterDnsAddr"
+// +kubebuilder:printcolumn:name="cluster-Dns-Addr",type="string",JSONPath=".status.init.dnsAddr",description="clusterDnsAddr"
 // +kubebuilder:printcolumn:name="service-Cluster-IpRange",type="string",JSONPath=".spec.serviceClusterIpRange",description="serviceClusterIpRange"
 // +kubebuilder:printcolumn:name="access-address",type="string",JSONPath=".spec.access.address",description="access-address"
 // +kubebuilder:printcolumn:name="access-port",type="string",JSONPath=".spec.access.port",description="access-port"
