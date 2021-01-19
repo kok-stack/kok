@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/coreos/etcd-operator/pkg/apis/etcd/v1beta2"
 	v1 "k8s.io/api/apps/v1"
 	v12 "k8s.io/api/batch/v1"
 	v13 "k8s.io/api/core/v1"
@@ -103,8 +104,6 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *Clu
 	rl.Info("Cluster Reconcile", "version", c.Spec.ClusterVersion, "name", c.Name, "namespace", c.Namespace)
 	total := len(modules)
 	for index, module := range modules {
-		//TODO:判断完成后再进行下一步
-		time.Sleep(time.Second * 2)
 		moduleName := module.Name
 		moduleString := fmt.Sprintf("[%v/%v]%s ", index+1, total, moduleName)
 		moduleInst := module.copy()
@@ -139,6 +138,9 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *Clu
 				}, err
 			}
 		}
+		if !moduleInst.Ready() {
+			break
+		}
 	}
 	rl.Info("update Cluster(crd) status")
 	if len(c.GetFinalizers()) == 0 {
@@ -158,6 +160,6 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *Clu
 
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&clusterv1.Cluster{}).Owns(&v1.Deployment{}).Owns(&v12.Job{}).Owns(&v13.Service{}).
+		For(&clusterv1.Cluster{}).Owns(&v1.Deployment{}).Owns(&v12.Job{}).Owns(&v13.Service{}).Owns(&v1beta2.EtcdCluster{}).
 		Complete(r)
 }

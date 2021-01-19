@@ -44,4 +44,10 @@ var etcdCRD = &SubModule{
 		c.Status.Etcd.Name = obj.Name
 		c.Status.Etcd.Status = obj.Status
 	},
+	ready: func(c *tanxv1.Cluster) bool {
+		if len(c.Status.Etcd.Status.Members.Ready) == c.Status.Etcd.Status.Size && (c.Status.Etcd.Status.Size == c.Spec.EtcdSpec.Count) {
+			return true
+		}
+		return false
+	},
 }

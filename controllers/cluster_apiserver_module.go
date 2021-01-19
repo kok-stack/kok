@@ -161,4 +161,12 @@ var apiServerSvc = &SubModule{
 		svc := object.(*v1.Service)
 		c.Status.ApiServer.SvcName = svc.Name
 	},
+	ready: func(c *tanxv1.Cluster) bool {
+		for _, condition := range c.Status.ApiServer.Status.Conditions {
+			if v12.DeploymentAvailable == condition.Type {
+				return true
+			}
+		}
+		return false
+	},
 }

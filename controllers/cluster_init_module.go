@@ -151,6 +151,14 @@ var InitJob = &SubModule{
 		}
 		return err
 	},
+	ready: func(c *tanxv1.Cluster) bool {
+		for _, condition := range c.Status.Init.Status.Conditions {
+			if v1.JobComplete == condition.Type {
+				return true
+			}
+		}
+		return false
+	},
 }
 
 func getEtcdSvcClientName(c *tanxv1.Cluster) string {

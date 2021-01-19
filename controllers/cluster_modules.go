@@ -28,6 +28,7 @@ type Module interface {
 	Create() error
 	StatusUpdate() error
 	Delete() error
+	Ready() bool
 }
 
 var modules = []ParentModule{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule, installPostModule}
@@ -42,6 +43,15 @@ type ParentModule struct {
 	logr.Logger
 	Sub []Module
 	r   *ClusterReconciler
+}
+
+func (i *ParentModule) Ready() bool {
+	for _, module := range i.Sub {
+		if !module.Ready() {
+			return false
+		}
+	}
+	return true
 }
 
 func (i ParentModule) copy() Module {
@@ -112,6 +122,14 @@ type SubModule struct {
 	updateStatus func(c *v1.Cluster, object Object)
 	//delete not set owner obj
 	delete func(ctx context.Context, c *v1.Cluster, client client.Client) error
+	ready  func(c *v1.Cluster) bool
+}
+
+func (s *SubModule) Ready() bool {
+	if s.ready == nil {
+		return true
+	}
+	return s.ready(s.c)
 }
 
 func (s *SubModule) Delete() error {
