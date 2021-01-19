@@ -45,14 +45,17 @@ type ClusterEtcdSpec struct {
 }
 
 type ClusterApiServerSpec struct {
+	Count     int32 `json:"count"`
 	ImageBase `json:",inline"`
 }
 
 type ClusterControllerManagerSpec struct {
+	Count     int32 `json:"count"`
 	ImageBase `json:",inline"`
 }
 
 type ClusterSchedulerSpec struct {
+	Count     int32 `json:"count"`
 	ImageBase `json:",inline"`
 }
 
@@ -68,26 +71,23 @@ type ClusterKubeProxySpec struct {
 	BindAddress string `json:"bindAddress,omitempty"`
 }
 
+//TODO: 组件 就绪/存活探针
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
-	//TODO:domain设置
-	ClusterVersion        string `json:"clusterVersion"`
-	ClusterCIDR           string `json:"clusterCidr"`
-	ServiceClusterIpRange string `json:"serviceClusterIpRange"`
-	//TODO:image mirror
-	AccessSpec ClusterAccessSpec `json:"access"`
-	InitSpec   ClusterInitSpec   `json:"init,omitempty"`
-	//TODO:count,etcdOperator
-	EtcdSpec ClusterEtcdSpec `json:"etcd,omitempty"`
-	//TODO:count
-	ApiServerSpec ClusterApiServerSpec `json:"apiServer,omitempty"`
-	//TODO:count
+	ClusterDomain         string                       `json:"clusterDomain,omitempty"`
+	ClusterVersion        string                       `json:"clusterVersion"`
+	ClusterCIDR           string                       `json:"clusterCidr"`
+	ServiceClusterIpRange string                       `json:"serviceClusterIpRange"`
+	RegistryMirrors       []string                     `json:"registryMirrors,omitempty"`
+	AccessSpec            ClusterAccessSpec            `json:"access"`
+	InitSpec              ClusterInitSpec              `json:"init,omitempty"`
+	EtcdSpec              ClusterEtcdSpec              `json:"etcd,omitempty"`
+	ApiServerSpec         ClusterApiServerSpec         `json:"apiServer,omitempty"`
 	ControllerManagerSpec ClusterControllerManagerSpec `json:"controllerManager,omitempty"`
-	//TODO:count
-	SchedulerSpec ClusterSchedulerSpec `json:"scheduler,omitempty"`
-	ClientSpec    ClusterClientSpec    `json:"client,omitempty"`
-	KubeletSpec   ClusterKubeletSpec   `json:"kubelet,omitempty"`
-	KubeProxySpec ClusterKubeProxySpec `json:"kubeProxy,omitempty"`
+	SchedulerSpec         ClusterSchedulerSpec         `json:"scheduler,omitempty"`
+	ClientSpec            ClusterClientSpec            `json:"client,omitempty"`
+	KubeletSpec           ClusterKubeletSpec           `json:"kubelet,omitempty"`
+	KubeProxySpec         ClusterKubeProxySpec         `json:"kubeProxy,omitempty"`
 }
 
 type ClusterInitStatus struct {

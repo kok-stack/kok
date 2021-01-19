@@ -4,9 +4,13 @@ metadata:
   name: test
   namespace: test
 spec:
+  clusterDomain: "cluster.local"
   clusterVersion: 1.18.4
   clusterCidr: 10.0.0.0/8
   serviceClusterIpRange: 10.96.0.0/12
+  registryMirrors:
+    - "https://registry.docker-cn.com"
+    - "https://a.docker-cn.com"
   access:
     address: "127.0.0.1"
     port: "9999"
@@ -16,10 +20,13 @@ spec:
     count: 3
     image: registry.aliyuncs.com/google_containers/etcd:3.3.10
   apiServer:
+    count: 3
     image: registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.4
   controllerManager:
+    count: 3
     image: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.4
   scheduler:
+    count: 3
     image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4
   client:
     image: ccr.ccs.tencentyun.com/k8s-test/init:v1

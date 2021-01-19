@@ -18,8 +18,7 @@ var schedulerDept = &SubModule{
 		return &v12.Deployment{}
 	},
 	render: func(c *tanxv1.Cluster, s *SubModule) Object {
-		//TODO:定制Replicas数量
-		var rep int32 = 1
+		var rep = c.Spec.SchedulerSpec.Count
 		name := fmt.Sprintf("%s-scheduler", c.Name)
 		var out = &v12.Deployment{
 			ObjectMeta: metav1.ObjectMeta{

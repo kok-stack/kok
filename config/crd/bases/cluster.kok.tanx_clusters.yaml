@@ -61,7 +61,6 @@ spec:
           description: ClusterSpec defines the desired state of Cluster
           properties:
             access:
-              description: TODO:image mirror
               properties:
                 address:
                   type: string
@@ -72,11 +71,14 @@ spec:
               - port
               type: object
             apiServer:
-              description: TODO:count
               properties:
+                count:
+                  format: int32
+                  type: integer
                 image:
                   type: string
               required:
+              - count
               - image
               type: object
             client:
@@ -88,19 +90,22 @@ spec:
               type: object
             clusterCidr:
               type: string
+            clusterDomain:
+              type: string
             clusterVersion:
-              description: TODO:domain设置
               type: string
             controllerManager:
-              description: TODO:count
               properties:
+                count:
+                  format: int32
+                  type: integer
                 image:
                   type: string
               required:
+              - count
               - image
               type: object
             etcd:
-              description: TODO:count,etcdOperator
               properties:
                 count:
                   type: integer
@@ -129,12 +134,19 @@ spec:
               required:
               - podInfraContainerImage
               type: object
+            registryMirrors:
+              items:
+                type: string
+              type: array
             scheduler:
-              description: TODO:count
               properties:
+                count:
+                  format: int32
+                  type: integer
                 image:
                   type: string
               required:
+              - count
               - image
               type: object
             serviceClusterIpRange:

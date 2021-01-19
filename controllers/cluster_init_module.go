@@ -84,6 +84,9 @@ var InitJob = &SubModule{
 						}, {
 							Name:  "NODE_CONFIG_NAME",
 							Value: getNodeConfigName(c),
+						}, {
+							Name:  "CLUSTER_DOMAIN",
+							Value: c.Spec.ClusterDomain,
 						}},
 					}},
 					RestartPolicy:      v12.RestartPolicyNever,

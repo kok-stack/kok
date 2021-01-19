@@ -13,7 +13,6 @@ var installPostModule = ParentModule{
 	Sub:  []Module{installPostJob},
 }
 
-//TODO:如何更好的初始化 coredns,网络cni 插件?
 var installPostJob = &SubModule{
 	getObj: func() Object {
 		return &v13.Job{}

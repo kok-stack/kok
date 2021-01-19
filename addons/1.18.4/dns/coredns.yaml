@@ -52,7 +52,7 @@ data:
           lameduck 5s
         }
         ready
-        kubernetes cluster.local in-addr.arpa ip6.arpa {
+        kubernetes {{.Spec.ClusterDomain}} in-addr.arpa ip6.arpa {
           fallthrough in-addr.arpa ip6.arpa
         }
         prometheus :9153

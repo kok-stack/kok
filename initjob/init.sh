@@ -76,15 +76,15 @@ cat <<EOF >etcd-csr.json
     "${ETCD_SVC_NAME}.${NAMESPACE}.svc",
     "*.${ETCD_SVC_NAME}.${NAMESPACE}.svc",
     "${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster",
-    "${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster.local",
-    "*.${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster.local",
+    "${ETCD_SVC_NAME}.${NAMESPACE}.svc.${CLUSTER_DOMAIN}",
+    "*.${ETCD_SVC_NAME}.${NAMESPACE}.svc.${CLUSTER_DOMAIN}",
     "${ETCD_SVC_CLIENT_NAME}",
     "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}",
     "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc",
     "*.${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc",
     "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster",
-    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster.local",
-    "*.${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster.local"
+    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.${CLUSTER_DOMAIN}",
+    "*.${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.${CLUSTER_DOMAIN}"
   ],
   "names": [
     {
@@ -135,11 +135,11 @@ cat <<EOF >k8s-server-csr.json
         "${APISERVER_ADDRESS}.${NAMESPACE}",
         "${APISERVER_ADDRESS}.${NAMESPACE}.svc",
         "${APISERVER_ADDRESS}.${NAMESPACE}.svc.cluster",
-        "${APISERVER_ADDRESS}.${NAMESPACE}.svc.cluster.local",
+        "${APISERVER_ADDRESS}.${NAMESPACE}.svc.${CLUSTER_DOMAIN}",
         "kubernetes.default",
         "kubernetes.default.svc",
         "kubernetes.default.svc.cluster",
-        "kubernetes.default.svc.cluster.local",
+        "kubernetes.default.svc.${CLUSTER_DOMAIN}",
         "${KUBE_SVC_ADDR}",
         "${FRONT_APISERVER_ADDRESS}"
     ],

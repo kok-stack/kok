@@ -26,4 +26,4 @@ service docker restart
 service kubelet start
 service kubeproxy start
 
-# curl -fsSL http://localhost:7788/download/test/test/node-install/install.sh | bash -s http://localhost:7788
+# curl -fsSL http://localhost:7788/download/test/test/node/install.sh | bash -s http://localhost:7788

@@ -14,7 +14,7 @@ authorization:
     cacheUnauthorizedTTL: 0s
 clusterDNS:
   - {{.Status.Init.DnsAddr}}
-clusterDomain: cluster.local
+clusterDomain: {{.Spec.ClusterDomain}}
 cpuManagerReconcilePeriod: 0s
 evictionPressureTransitionPeriod: 0s
 fileCheckFrequency: 0s

@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"strings"
 	"text/template"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -100,9 +101,10 @@ func main() {
 const addonsDirName = "/mnt/d/code/kok/addons"
 
 var version2Addons = map[string]map[string]*template.Template{}
+var defaultTemplateFuncs = template.FuncMap{"join": strings.Join}
 
 func startAddonsDownloader(mgr manager.Manager) {
-	client := mgr.GetClient()
+	c := mgr.GetClient()
 
 	err := initTemplateMaps()
 	if err != nil {
@@ -116,7 +118,7 @@ func startAddonsDownloader(mgr manager.Manager) {
 		filename := ctx.Param("filename")
 
 		cls := &clusterv1.Cluster{}
-		err := client.Get(ctx, types.NamespacedName{
+		err := c.Get(ctx, types.NamespacedName{
 			Namespace: ns,
 			Name:      name,
 		}, cls)
@@ -136,11 +138,11 @@ func startAddonsDownloader(mgr manager.Manager) {
 		ctx.Writer.Flush()
 	})
 	engine.Any("/meta/:namespace/:name/ca/:filename", func(ctx *gin.Context) {
-		getMeta(ctx, client, "ca")
+		getMeta(ctx, c, "ca")
 	})
 
 	engine.Any("/meta/:namespace/:name/nodeconfig/:filename", func(ctx *gin.Context) {
-		getMeta(ctx, client, "nodeconfig")
+		getMeta(ctx, c, "nodeconfig")
 	})
 
 	if err := engine.Run(":7788"); err != nil {
@@ -210,7 +212,8 @@ func initTemplateMaps() error {
 			if !info.IsDir() {
 				continue
 			}
-			t, err := template.ParseGlob(filepath.Join(join, info.Name()) + "/*")
+			name := filepath.Join(join, info.Name())
+			t, err := template.New(name).Funcs(defaultTemplateFuncs).ParseGlob(name + "/*")
 			if err != nil {
 				return err
 			}

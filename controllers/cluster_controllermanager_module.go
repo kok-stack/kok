@@ -18,8 +18,7 @@ var controllerMgrDept = &SubModule{
 		return &v12.Deployment{}
 	},
 	render: func(c *tanxv1.Cluster, s *SubModule) Object {
-		//TODO:定制Replicas数量
-		var rep int32 = 1
+		var rep int32 = c.Spec.ControllerManagerSpec.Count
 		name := fmt.Sprintf("%s-controller-manager", c.Name)
 		var out = &v12.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
