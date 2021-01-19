@@ -1,9 +1,8 @@
 #!/bin/bash
 set -e
+env
 # set ff=unix
 echo '==================init variable==================='
-echo "$APISERVER_ADDRESS"
-echo "$FRONT_APISERVER_ADDRESS"
 NAMESPACE=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
 echo "$NAMESPACE"
 
@@ -71,8 +70,21 @@ cat <<EOF >etcd-csr.json
     "size": 2048
   },
   "hosts": [
-    "example.net",
-    "www.example.net"
+    "localhost",
+    "${ETCD_SVC_NAME}",
+    "${ETCD_SVC_NAME}.${NAMESPACE}",
+    "${ETCD_SVC_NAME}.${NAMESPACE}.svc",
+    "*.${ETCD_SVC_NAME}.${NAMESPACE}.svc",
+    "${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster",
+    "${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster.local",
+    "*.${ETCD_SVC_NAME}.${NAMESPACE}.svc.cluster.local",
+    "${ETCD_SVC_CLIENT_NAME}",
+    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}",
+    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc",
+    "*.${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc",
+    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster",
+    "${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster.local",
+    "*.${ETCD_SVC_CLIENT_NAME}.${NAMESPACE}.svc.cluster.local"
   ],
   "names": [
     {
@@ -160,7 +172,11 @@ echo '==============admin.config======================='
 
 #kubectl create secret generic pki --from-file=ca-config.json --from-file=ca-csr.json --from-file=ca-key.pem --from-file=ca.csr --from-file=ca.pem --from-file=etcd-csr.json --from-file=etcd-key.pem --from-file=etcd.csr --from-file=etcd.pem --from-file=k8s-client-csr.json --from-file=k8s-server-csr.json --from-file=kubernetes-node-key.pem --from-file=kubernetes-node.csr --from-file=kubernetes-node.pem --from-file=kubernetes-server-key.pem --from-file=kubernetes-server.csr --from-file=kubernetes-server.pem
 kubectl create secret generic "${CA_PKI_NAME}" --from-file=ca-config.json --from-file=ca-csr.json --from-file=ca-key.pem --from-file=ca.csr --from-file=ca.pem
-kubectl create secret generic "${ETCD_PKI_NAME}" --from-file=etcd-csr.json --from-file=etcd-key.pem --from-file=etcd.csr --from-file=etcd.pem
+
+kubectl create secret generic "${ETCD_PKI_PEER_NAME}" --from-file=peer-ca.crt=ca.pem --from-file=peer.crt=etcd.pem --from-file=peer.key=etcd-key.pem
+kubectl create secret generic "${ETCD_PKI_SERVER_NAME}" --from-file=server-ca.crt=ca.pem --from-file=server.crt=etcd.pem --from-file=server.key=etcd-key.pem
+kubectl create secret generic "${ETCD_PKI_CLIENT_NAME}" --from-file=etcd-client-ca.crt=ca.pem --from-file=etcd-client.crt=etcd.pem --from-file=etcd-client.key=etcd-key.pem
+
 kubectl create secret generic "${K8S_SERVER_NAME}" --from-file=k8s-server-csr.json --from-file=kubernetes-server-key.pem --from-file=kubernetes-server.csr --from-file=kubernetes-server.pem
 kubectl create secret generic "${K8S_CLIENT_NAME}" --from-file=k8s-client-csr.json --from-file=kubernetes-node-key.pem --from-file=kubernetes-node.csr --from-file=kubernetes-node.pem
 kubectl create secret generic "${ADMIN_CONFIG_NAME}" --from-file=admin.config

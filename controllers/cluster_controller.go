@@ -103,6 +103,8 @@ func Reconcile(ctx context.Context, c *clusterv1.Cluster, rl logr.Logger, r *Clu
 	rl.Info("Cluster Reconcile", "version", c.Spec.ClusterVersion, "name", c.Name, "namespace", c.Namespace)
 	total := len(modules)
 	for index, module := range modules {
+		//TODO:判断完成后再进行下一步
+		time.Sleep(time.Second * 2)
 		moduleName := module.Name
 		moduleString := fmt.Sprintf("[%v/%v]%s ", index+1, total, moduleName)
 		moduleInst := module.copy()

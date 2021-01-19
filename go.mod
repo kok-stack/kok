@@ -3,6 +3,7 @@ module github.com/tangxusc/kok
 go 1.13
 
 require (
+	github.com/coreos/etcd-operator v0.9.4
 	github.com/gin-gonic/gin v1.6.3
 	github.com/go-logr/logr v0.1.0
 	github.com/onsi/ginkgo v1.11.0

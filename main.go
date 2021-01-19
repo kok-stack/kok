@@ -49,6 +49,7 @@ func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
 
 	_ = clusterv1.AddToScheme(scheme)
+	_ = clusterv1.EtcdAddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
 

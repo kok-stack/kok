@@ -58,8 +58,20 @@ var InitJob = &SubModule{
 							Name:  "CA_PKI_NAME",
 							Value: getCAPkiName(c),
 						}, {
-							Name:  "ETCD_PKI_NAME",
-							Value: getEtcdPkiName(c),
+							Name:  "ETCD_SVC_NAME",
+							Value: getEtcdSvcName(c),
+						}, {
+							Name:  "ETCD_SVC_CLIENT_NAME",
+							Value: getEtcdSvcClientName(c),
+						}, {
+							Name:  "ETCD_PKI_PEER_NAME",
+							Value: getEtcdPkiPeerName(c),
+						}, {
+							Name:  "ETCD_PKI_SERVER_NAME",
+							Value: getEtcdPkiServerName(c),
+						}, {
+							Name:  "ETCD_PKI_CLIENT_NAME",
+							Value: getEtcdPkiClientName(c),
 						}, {
 							Name:  "K8S_SERVER_NAME",
 							Value: getServerName(c),
@@ -93,8 +105,16 @@ var InitJob = &SubModule{
 				c.Status.Init.CaPkiName = env.Value
 				continue
 			}
-			if env.Name == "ETCD_PKI_NAME" {
-				c.Status.Init.EtcdPkiName = env.Value
+			if env.Name == "ETCD_PKI_PEER_NAME" {
+				c.Status.Init.EtcdPkiPeerName = env.Value
+				continue
+			}
+			if env.Name == "ETCD_PKI_SERVER_NAME" {
+				c.Status.Init.EtcdPkiServerName = env.Value
+				continue
+			}
+			if env.Name == "ETCD_PKI_CLIENT_NAME" {
+				c.Status.Init.EtcdPkiClientName = env.Value
 				continue
 			}
 			if env.Name == "K8S_SERVER_NAME" {
@@ -117,7 +137,7 @@ var InitJob = &SubModule{
 	},
 	delete: func(ctx context.Context, c *tanxv1.Cluster, client client.Client) error {
 		var err error
-		nameFunc := []func(cluster *tanxv1.Cluster) string{getCAPkiName, getEtcdPkiName, getServerName, getClientName, getNodeConfigName, getAdminConfigName}
+		nameFunc := []func(cluster *tanxv1.Cluster) string{getCAPkiName, getEtcdPkiClientName, getEtcdPkiServerName, getEtcdPkiPeerName, getServerName, getClientName, getNodeConfigName, getAdminConfigName}
 		for _, namef := range nameFunc {
 			err = client.Delete(ctx, &v12.Secret{
 				ObjectMeta: metav1.ObjectMeta{Name: namef(c), Namespace: c.Namespace},
@@ -133,6 +153,26 @@ var InitJob = &SubModule{
 	},
 }
 
+func getEtcdSvcClientName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd-client", c.Name)
+}
+
+func getEtcdSvcName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd", c.Name)
+}
+
+func getEtcdPkiClientName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd-pki-client", c.Name)
+}
+
+func getEtcdPkiServerName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd-pki-server", c.Name)
+}
+
+func getEtcdPkiPeerName(c *tanxv1.Cluster) string {
+	return fmt.Sprintf("%s-etcd-pki-peer", c.Name)
+}
+
 func NextIpForRange(ipRange string, step int64) string {
 	ip, _, _ := net.ParseCIDR(ipRange)
 	ret := big.NewInt(0)
@@ -143,10 +183,6 @@ func NextIpForRange(ipRange string, step int64) string {
 
 func getCAPkiName(c *tanxv1.Cluster) string {
 	return fmt.Sprintf("%s-ca-pki", c.Name)
-}
-
-func getEtcdPkiName(c *tanxv1.Cluster) string {
-	return fmt.Sprintf("%s-etcd-pki", c.Name)
 }
 
 func getServerName(c *tanxv1.Cluster) string {

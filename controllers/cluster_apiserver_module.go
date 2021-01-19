@@ -49,9 +49,9 @@ var apiServerDept = &SubModule{
 									"--client-ca-file=/pki/ca/ca.pem",
 									"--enable-admission-plugins=NamespaceLifecycle,LimitRanger,ServiceAccount,TaintNodesByCondition,Priority,DefaultTolerationSeconds,DefaultStorageClass,StorageObjectInUseProtection,PersistentVolumeClaimResize,MutatingAdmissionWebhook,ValidatingAdmissionWebhook,RuntimeClass,ResourceQuota",
 									"--etcd-cafile=/pki/ca/ca.pem",
-									"--etcd-certfile=/pki/etcd/etcd.pem",
-									"--etcd-keyfile=/pki/etcd/etcd-key.pem",
-									fmt.Sprintf("--etcd-servers=http://%s:2379", c.Status.Etcd.SvcName),
+									"--etcd-certfile=/pki/etcd/etcd-client.crt",
+									"--etcd-keyfile=/pki/etcd/etcd-client.key",
+									fmt.Sprintf("--etcd-servers=https://%s:%v", c.Status.Etcd.SvcName, c.Status.Etcd.Status.ClientPort),
 									"--insecure-port=0",
 									"--kubelet-client-certificate=/pki/client/kubernetes-node.pem",
 									"--kubelet-client-key=/pki/client/kubernetes-node-key.pem",
@@ -97,7 +97,7 @@ var apiServerDept = &SubModule{
 						}, {
 							Name: "etcd-pki",
 							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
-								SecretName: c.Status.Init.EtcdPkiName,
+								SecretName: c.Status.Init.EtcdPkiClientName,
 							}},
 						}, {
 							Name: "k8s-server",

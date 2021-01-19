@@ -89,7 +89,7 @@ var clientDept = &SubModule{
 						}, {
 							Name: "etcd-pki",
 							VolumeSource: v1.VolumeSource{Secret: &v1.SecretVolumeSource{
-								SecretName: c.Status.Init.EtcdPkiName,
+								SecretName: c.Status.Init.EtcdPkiClientName,
 							}},
 						}, {
 							Name: "k8s-server",

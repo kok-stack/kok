@@ -17,6 +17,7 @@ limitations under the License.
 package v1
 
 import (
+	"github.com/coreos/etcd-operator/pkg/apis/etcd/v1beta2"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,6 +40,7 @@ type ClusterInitSpec struct {
 }
 
 type ClusterEtcdSpec struct {
+	Count     int `json:"count"`
 	ImageBase `json:",inline"`
 }
 
@@ -91,7 +93,6 @@ type ClusterSpec struct {
 type ClusterInitStatus struct {
 	Name               string            `json:"name,omitempty"`
 	CaPkiName          string            `json:"caPkiName,omitempty"`
-	EtcdPkiName        string            `json:"etcdPkiName,omitempty"`
 	ServerName         string            `json:"serverName,omitempty"`
 	ClientName         string            `json:"clientName,omitempty"`
 	AdminConfigName    string            `json:"adminConfigName,omitempty"`
@@ -100,12 +101,15 @@ type ClusterInitStatus struct {
 	RoleBindingName    string            `json:"roleBindingName,omitempty"`
 	Status             batchv1.JobStatus `json:"status,omitempty"`
 	DnsAddr            string            `json:"dnsAddr,omitempty"`
+	EtcdPkiPeerName    string            `json:"etcdPkiPeerName,omitempty"`
+	EtcdPkiServerName  string            `json:"etcdPkiServerName,omitempty"`
+	EtcdPkiClientName  string            `json:"etcdPkiClientName,omitempty"`
 }
 
 type ClusterEtcdStatus struct {
-	Name    string                  `json:"name,omitempty"`
-	SvcName string                  `json:"svcName,omitempty"`
-	Status  appsv1.DeploymentStatus `json:"status,omitempty"`
+	Name    string                `json:"name,omitempty"`
+	SvcName string                `json:"svcName,omitempty"`
+	Status  v1beta2.ClusterStatus `json:"status,omitempty"`
 }
 
 type ClusterApiServerStatus struct {
@@ -175,4 +179,5 @@ type ClusterList struct {
 
 func init() {
 	SchemeBuilder.Register(&Cluster{}, &ClusterList{})
+	EtcdSchemeBuilder.Register(&v1beta2.EtcdCluster{}, &v1beta2.EtcdClusterList{})
 }
