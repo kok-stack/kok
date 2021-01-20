@@ -102,8 +102,7 @@ func main() {
 	}
 }
 
-//const addonsDirName = "addons"
-const addonsDirName = "/mnt/d/code/kok/addons"
+const addonsDirName = "addons"
 
 var version2Addons = map[string]map[string]*template.Template{}
 var defaultTemplateFuncs = template.FuncMap{"join": strings.Join}
