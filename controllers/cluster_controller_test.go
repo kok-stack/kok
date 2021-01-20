@@ -16,7 +16,7 @@ package controllers
 //				Port:    "8899",
 //			},
 //			InitSpec: v1.ClusterInitSpec{
-//				v1.ImageBase{Image: "ccr.ccs.tencentyun.com/k8s-test/init:v1"},
+//				v1.ImageBase{Image: "ccr.ccs.tencentyun.com/k8sonk8s/init:v1"},
 //			},
 //			EtcdSpec: v1.ClusterEtcdSpec{v1.ImageBase{Image: "registry.aliyuncs.com/google_containers/etcd:3.3.10"}},
 //		},

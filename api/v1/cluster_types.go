@@ -75,9 +75,9 @@ type ClusterKubeProxySpec struct {
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	ClusterDomain         string                       `json:"clusterDomain,omitempty"`
-	ClusterVersion        string                       `json:"clusterVersion"`
-	ClusterCIDR           string                       `json:"clusterCidr"`
-	ServiceClusterIpRange string                       `json:"serviceClusterIpRange"`
+	ClusterVersion        string                       `json:"clusterVersion,omitempty"`
+	ClusterCIDR           string                       `json:"clusterCidr,omitempty"`
+	ServiceClusterIpRange string                       `json:"serviceClusterIpRange,omitempty"`
 	RegistryMirrors       []string                     `json:"registryMirrors,omitempty"`
 	AccessSpec            ClusterAccessSpec            `json:"access"`
 	InitSpec              ClusterInitSpec              `json:"init,omitempty"`

@@ -15,7 +15,7 @@ spec:
     address: "127.0.0.1"
     port: "9999"
   init:
-    image: ccr.ccs.tencentyun.com/k8s-test/init:v1
+    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1
   etcd:
     count: 3
     image: registry.aliyuncs.com/google_containers/etcd:3.3.10
@@ -29,7 +29,7 @@ spec:
     count: 3
     image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4
   client:
-    image: ccr.ccs.tencentyun.com/k8s-test/init:v1
+    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1
   kubelet:
     podInfraContainerImage: registry.aliyuncs.com/google_containers/pause:3.1
   kubeProxy:

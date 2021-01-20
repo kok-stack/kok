@@ -1,0 +1,10 @@
+apiVersion: cluster.kok.tanx/v1
+kind: Cluster
+metadata:
+  name: abcd
+  namespace: test
+spec:
+  clusterDomain: "abcd11.local"
+  access:
+    address: "127.0.0.1"
+    port: "9999"

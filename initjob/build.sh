@@ -1,1 +1,1 @@
-docker build -t ccr.ccs.tencentyun.com/k8s-test/init:v1 .
+docker build -t ccr.ccs.tencentyun.com/k8sonk8s/init:v1 .
