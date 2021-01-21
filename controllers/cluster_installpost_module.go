@@ -8,16 +8,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var installPostModule = ParentModule{
+var installPostModule = &Module{
 	Name: "install-job",
-	Sub:  []Module{installPostJob},
+	Sub:  []*Module{installPostJob},
 }
 
-var installPostJob = &SubModule{
+var installPostJob = &Module{
 	getObj: func() Object {
 		return &v13.Job{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		out := &v13.Job{}
 		out.Name = fmt.Sprintf("%s-install-post", c.Name)
 		out.Namespace = c.Namespace
@@ -116,9 +116,11 @@ var installPostJob = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		job := object.(*v13.Job)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		job := now.(*v13.Job)
 		c.Status.PostInstall.Status = job.Status
 		c.Status.PostInstall.Name = job.Name
+
+		return false, now
 	},
 }

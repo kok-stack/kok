@@ -6,18 +6,19 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
-var schedulerModule = ParentModule{
+var schedulerModule = &Module{
 	Name: "scheduler-dept",
-	Sub:  []Module{schedulerDept},
+	Sub:  []*Module{schedulerDept},
 }
 
-var schedulerDept = &SubModule{
+var schedulerDept = &Module{
 	getObj: func() Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		var rep = c.Spec.SchedulerSpec.Count
 		name := fmt.Sprintf("%s-scheduler", c.Name)
 		var out = &v12.Deployment{
@@ -97,9 +98,17 @@ var schedulerDept = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		dept := object.(*v12.Deployment)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		dept := now.(*v12.Deployment)
 		c.Status.Scheduler.Status = dept.Status
 		c.Status.Scheduler.Name = dept.Name
+
+		t := target.(*v12.Deployment)
+		n := now.(*v12.Deployment)
+		if !reflect.DeepEqual(t.Spec, n.Spec) {
+			n.Spec = t.Spec
+			return true, n
+		}
+		return false, n
 	},
 }

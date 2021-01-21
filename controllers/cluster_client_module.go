@@ -6,18 +6,19 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
-var clientModule = ParentModule{
+var clientModule = &Module{
 	Name: "client-dept",
-	Sub:  []Module{clientDept},
+	Sub:  []*Module{clientDept},
 }
 
-var clientDept = &SubModule{
+var clientDept = &Module{
 	getObj: func() Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		var rep int32 = 1
 		var termination int64 = 1
 		name := fmt.Sprintf("%s-client", c.Name)
@@ -125,9 +126,17 @@ var clientDept = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		dept := object.(*v12.Deployment)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		dept := now.(*v12.Deployment)
 		c.Status.Client.Status = dept.Status
 		c.Status.Client.Name = dept.Name
+
+		t := target.(*v12.Deployment)
+		n := now.(*v12.Deployment)
+		if !reflect.DeepEqual(t.Spec, n.Spec) {
+			n.Spec = t.Spec
+			return true, n
+		}
+		return false, n
 	},
 }

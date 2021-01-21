@@ -16,145 +16,86 @@ import (
 
 const FinalizerName = "finalizer.cluster.kok.tanx"
 
+var modules = []*Module{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule, installPostModule}
+var VersionsModules = map[string][]*Module{
+	"1.18.4": modules,
+}
+
 type Object interface {
 	runtime.Object
 	metav1.Object
 	metav1.ObjectMetaAccessor
 }
 
-type Module interface {
-	Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger)
-	Exist() (bool, error)
-	Create() error
-	StatusUpdate() error
-	Delete() error
-	Ready() bool
+func AddModules(key string, m ...*Module) {
+	value, ok := VersionsModules[key]
+	if !ok {
+		value = make([]*Module, 0)
+	}
+	value = append(value, m...)
+	VersionsModules[key] = value
 }
 
-var modules = []ParentModule{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule, installPostModule}
-var VersionsModules = map[string][]ParentModule{
-	"1.18.4": modules,
-}
-
-type ParentModule struct {
-	Name string
+type ModuleContext struct {
 	context.Context
-	c *v1.Cluster
+	*v1.Cluster
 	logr.Logger
-	Sub []Module
-	r   *ClusterReconciler
+	*ClusterReconciler
 }
 
-func (i *ParentModule) Ready() bool {
-	for _, module := range i.Sub {
-		if !module.Ready() {
-			return false
+func NewModuleContext(context context.Context, c *v1.Cluster, logger logr.Logger, r *ClusterReconciler) *ModuleContext {
+	return &ModuleContext{Context: context, Cluster: c, Logger: logger, ClusterReconciler: r}
+}
+
+type Module struct {
+	Name string
+	Sub  []*Module
+
+	getObj    func() Object
+	render    func(c *v1.Cluster) Object
+	setStatus func(c *v1.Cluster, target, now Object) (bool, Object)
+	delete    func(ctx context.Context, c *v1.Cluster, client client.Client) error
+	ready     func(c *v1.Cluster) bool
+}
+
+func (m *Module) Reconcile(ctx *ModuleContext) error {
+	if !m.hasSub() {
+		exist, err := m.exist(ctx)
+		if err != nil {
+			return err
 		}
+		if exist {
+			if err := m.update(ctx); err != nil {
+				return err
+			}
+		} else {
+			if err := m.create(ctx); err != nil {
+				return err
+			}
+		}
+	} else {
+		for _, m := range m.Sub {
+			if err := m.Reconcile(ctx); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Module) hasSub() bool {
+	if m.Sub == nil || len(m.Sub) == 0 {
+		return false
 	}
 	return true
 }
 
-func (i ParentModule) copy() Module {
-	return &i
-}
-
-func (i *ParentModule) Delete() error {
-	for _, module := range i.Sub {
-		if err := module.Delete(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (i *ParentModule) Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger) {
-	i.Context = ctx
-	i.c = c
-	i.Logger = rl
-	i.r = r
-	for _, module := range i.Sub {
-		module.Init(ctx, c, r, rl)
-	}
-}
-
-func (i *ParentModule) Exist() (bool, error) {
-	d := true
-	for _, module := range i.Sub {
-		exist, err := module.Exist()
-		if err != nil {
-			return false, err
-		}
-		d = d && exist
-		if !d {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-func (i *ParentModule) Create() error {
-	for _, module := range i.Sub {
-		if err := module.Create(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (i *ParentModule) StatusUpdate() error {
-	for _, module := range i.Sub {
-		if err := module.StatusUpdate(); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-type SubModule struct {
-	context.Context
-	c *v1.Cluster
-	logr.Logger
-	target Object
-	r      *ClusterReconciler
-
-	getObj       func() Object
-	render       func(c *v1.Cluster, s *SubModule) Object
-	updateStatus func(c *v1.Cluster, object Object)
-	//delete not set owner obj
-	delete func(ctx context.Context, c *v1.Cluster, client client.Client) error
-	ready  func(c *v1.Cluster) bool
-}
-
-func (s *SubModule) Ready() bool {
-	if s.ready == nil {
-		return true
-	}
-	return s.ready(s.c)
-}
-
-func (s *SubModule) Delete() error {
-	if s.delete != nil {
-		err := s.delete(s, s.c, s.r.Client)
-		s.Logger.Info("call subModule custom delete result", "error", err)
-		return err
-	}
-	return nil
-}
-
-func (s *SubModule) Init(ctx context.Context, c *v1.Cluster, r *ClusterReconciler, rl logr.Logger) {
-	s.Context = ctx
-	s.c = c
-	s.r = r
-	s.Logger = rl
-
-	s.target = s.render(s.c, s)
-}
-
-func (s *SubModule) Exist() (bool, error) {
-	err := s.r.Get(s, types.NamespacedName{
-		Namespace: s.c.Namespace,
-		Name:      s.target.GetName(),
-	}, s.getObj())
+func (m *Module) exist(ctx *ModuleContext) (bool, error) {
+	render := m.render(ctx.Cluster)
+	err := ctx.Get(ctx, types.NamespacedName{
+		Namespace: ctx.Namespace,
+		Name:      render.GetName(),
+	}, m.getObj())
 	if err != nil && errors.IsNotFound(err) {
 		return false, nil
 	}
@@ -164,29 +105,71 @@ func (s *SubModule) Exist() (bool, error) {
 	return false, err
 }
 
-func (s *SubModule) Create() error {
-	if err := controllerutil.SetControllerReference(s.c, s.target, s.r.Scheme); err != nil {
+func (m *Module) update(ctx *ModuleContext) error {
+	obj := m.getObj()
+	render := m.render(ctx.Cluster)
+	if err := ctx.Client.Get(ctx, client.ObjectKey{
+		Namespace: ctx.Namespace,
+		Name:      render.GetName(),
+	}, obj); err != nil {
 		return err
 	}
-	s.r.Recorder.Event(s.c, v12.EventTypeNormal, "Creating", fmt.Sprintf("%s", s.target.GetName()))
-	err := s.r.Client.Create(s, s.target)
+
+	needUpdate, o := m.setStatus(ctx.Cluster, render, obj)
+	if needUpdate {
+		if err := ctx.Client.Update(ctx.Context, o); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m *Module) create(ctx *ModuleContext) error {
+	render := m.render(ctx.Cluster)
+	if err := controllerutil.SetControllerReference(ctx.Cluster, render, ctx.Scheme); err != nil {
+		return err
+	}
+	ctx.Recorder.Event(ctx, v12.EventTypeNormal, "Creating", render.GetName())
+	err := ctx.Client.Create(ctx, render)
 	if err != nil && errors.IsAlreadyExists(err) {
 		return nil
 	}
 	if err != nil {
-		s.r.Recorder.Event(s.c, v12.EventTypeWarning, "CreateError", fmt.Sprintf("%s,error:%v", s.target.GetName(), err))
+		ctx.Recorder.Event(ctx, v12.EventTypeWarning, "CreateError", fmt.Sprintf("%s,error:%v", render.GetName(), err))
 	}
 	return err
 }
 
-func (s *SubModule) StatusUpdate() error {
-	out := s.getObj()
-	if err := s.r.Client.Get(s, client.ObjectKey{
-		Namespace: s.c.Namespace,
-		Name:      s.target.GetName(),
-	}, out); err != nil {
-		return err
+func (m *Module) Ready(ctx *ModuleContext) bool {
+	if !m.hasSub() {
+		if m.ready != nil {
+			return m.ready(ctx.Cluster)
+		}
+		return true
+	} else {
+		for _, m := range m.Sub {
+			if !m.Ready(ctx) {
+				return false
+			}
+		}
 	}
-	s.updateStatus(s.c, out)
+	return true
+}
+
+func (m *Module) Delete(ctx *ModuleContext) error {
+	if !m.hasSub() {
+		if m.delete != nil {
+			err := m.delete(ctx, ctx.Cluster, ctx.Client)
+			if err != nil {
+				ctx.Logger.Error(err, "invoke module delete error")
+			}
+			return err
+		}
+	}
+	for _, m := range m.Sub {
+		if err := m.Delete(ctx); err != nil {
+			return err
+		}
+	}
 	return nil
 }

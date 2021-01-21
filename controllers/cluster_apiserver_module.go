@@ -6,18 +6,19 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
-var apiServerModule = ParentModule{
+var apiServerModule = &Module{
 	Name: "apiserver-dept",
-	Sub:  []Module{apiServerDept, apiServerSvc},
+	Sub:  []*Module{apiServerDept, apiServerSvc},
 }
 
-var apiServerDept = &SubModule{
+var apiServerDept = &Module{
 	getObj: func() Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		var rep = c.Spec.ApiServerSpec.Count
 		name := fmt.Sprintf("%s-apiserver", c.Name)
 		var out = &v12.Deployment{
@@ -122,18 +123,34 @@ var apiServerDept = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		dept := object.(*v12.Deployment)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		dept := now.(*v12.Deployment)
 		c.Status.ApiServer.Status = dept.Status
 		c.Status.ApiServer.Name = dept.Name
+
+		t := target.(*v12.Deployment)
+		n := now.(*v12.Deployment)
+		if !reflect.DeepEqual(t.Spec, n.Spec) {
+			n.Spec = t.Spec
+			return true, n
+		}
+		return false, n
+	},
+	ready: func(c *tanxv1.Cluster) bool {
+		for _, condition := range c.Status.ApiServer.Status.Conditions {
+			if v12.DeploymentAvailable == condition.Type {
+				return true
+			}
+		}
+		return false
 	},
 }
 
-var apiServerSvc = &SubModule{
+var apiServerSvc = &Module{
 	getObj: func() Object {
 		return &v1.Service{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		name := fmt.Sprintf("%s-apiserver", c.Name)
 		out := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -156,16 +173,10 @@ var apiServerSvc = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		svc := object.(*v1.Service)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		svc := now.(*v1.Service)
 		c.Status.ApiServer.SvcName = svc.Name
-	},
-	ready: func(c *tanxv1.Cluster) bool {
-		for _, condition := range c.Status.ApiServer.Status.Conditions {
-			if v12.DeploymentAvailable == condition.Type {
-				return true
-			}
-		}
-		return false
+
+		return false, now
 	},
 }

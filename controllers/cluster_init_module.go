@@ -14,16 +14,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var initModule = ParentModule{
+var initModule = &Module{
 	Name: "init-job",
-	Sub:  []Module{InitServiceAccount, InitRoleBinding, InitJob},
+	Sub:  []*Module{InitServiceAccount, InitRoleBinding, InitJob},
 }
 
-var InitJob = &SubModule{
+var InitJob = &Module{
 	getObj: func() Object {
 		return &v1.Job{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		out := &v1.Job{}
 		out.Name = fmt.Sprintf("%s-init", c.Name)
 		out.Namespace = c.Namespace
@@ -97,8 +97,8 @@ var InitJob = &SubModule{
 
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		job := object.(*v1.Job)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		job := now.(*v1.Job)
 		c.Status.Init.Status = job.Status
 		c.Status.Init.Name = job.Name
 		c.Status.Init.DnsAddr = NextIpForRange(c.Spec.ServiceClusterIpRange, 2)
@@ -137,6 +137,8 @@ var InitJob = &SubModule{
 				continue
 			}
 		}
+
+		return false, now
 	},
 	delete: func(ctx context.Context, c *tanxv1.Cluster, client client.Client) error {
 		var err error
@@ -212,11 +214,11 @@ func getAdminConfigName(c *tanxv1.Cluster) string {
 	return fmt.Sprintf("%s-admin-config", c.Name)
 }
 
-var InitServiceAccount = &SubModule{
+var InitServiceAccount = &Module{
 	getObj: func() Object {
 		return &v12.ServiceAccount{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		out := &v12.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-admin", c.Name),
@@ -225,17 +227,18 @@ var InitServiceAccount = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		out := object.(*v12.ServiceAccount)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		out := now.(*v12.ServiceAccount)
 		c.Status.Init.ServiceAccountName = out.Name
+		return false, now
 	},
 }
 
-var InitRoleBinding = &SubModule{
+var InitRoleBinding = &Module{
 	getObj: func() Object {
 		return &v13.RoleBinding{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		out := &v13.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-admin", c.Name),
@@ -256,8 +259,9 @@ var InitRoleBinding = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		out := object.(*v13.RoleBinding)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		out := now.(*v13.RoleBinding)
 		c.Status.Init.RoleBindingName = out.Name
+		return false, now
 	},
 }

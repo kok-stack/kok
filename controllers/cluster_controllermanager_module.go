@@ -6,19 +6,20 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
-var ctrMgtModule = ParentModule{
+var ctrMgtModule = &Module{
 	Name: "controllerManager-dept",
-	Sub:  []Module{controllerMgrDept},
+	Sub:  []*Module{controllerMgrDept},
 }
 
-var controllerMgrDept = &SubModule{
+var controllerMgrDept = &Module{
 	getObj: func() Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
-		var rep int32 = c.Spec.ControllerManagerSpec.Count
+	render: func(c *tanxv1.Cluster) Object {
+		var rep = c.Spec.ControllerManagerSpec.Count
 		name := fmt.Sprintf("%s-controller-manager", c.Name)
 		var out = &v12.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
@@ -110,9 +111,17 @@ var controllerMgrDept = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		dept := object.(*v12.Deployment)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		dept := now.(*v12.Deployment)
 		c.Status.ControllerManager.Status = dept.Status
 		c.Status.ControllerManager.Name = dept.Name
+
+		t := target.(*v12.Deployment)
+		n := now.(*v12.Deployment)
+		if !reflect.DeepEqual(t.Spec, n.Spec) {
+			n.Spec = t.Spec
+			return true, n
+		}
+		return false, n
 	},
 }

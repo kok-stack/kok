@@ -5,18 +5,19 @@ import (
 	"github.com/coreos/etcd-operator/pkg/apis/etcd/v1beta2"
 	tanxv1 "github.com/tangxusc/kok/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"reflect"
 )
 
-var etcdModule = ParentModule{
+var etcdModule = &Module{
 	Name: "etcd-crd",
-	Sub:  []Module{etcdCRD},
+	Sub:  []*Module{etcdCRD},
 }
 
-var etcdCRD = &SubModule{
+var etcdCRD = &Module{
 	getObj: func() Object {
 		return &v1beta2.EtcdCluster{}
 	},
-	render: func(c *tanxv1.Cluster, s *SubModule) Object {
+	render: func(c *tanxv1.Cluster) Object {
 		name := fmt.Sprintf("%s-etcd", c.Name)
 		var out = &v1beta2.EtcdCluster{
 			ObjectMeta: metav1.ObjectMeta{
@@ -38,11 +39,19 @@ var etcdCRD = &SubModule{
 		}
 		return out
 	},
-	updateStatus: func(c *tanxv1.Cluster, object Object) {
-		obj := object.(*v1beta2.EtcdCluster)
+	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+		obj := now.(*v1beta2.EtcdCluster)
 		c.Status.Etcd.SvcName = obj.Status.ServiceName
 		c.Status.Etcd.Name = obj.Name
 		c.Status.Etcd.Status = obj.Status
+
+		t := target.(*v1beta2.EtcdCluster)
+		n := now.(*v1beta2.EtcdCluster)
+		if !reflect.DeepEqual(t.Spec, n.Spec) {
+			n.Spec = t.Spec
+			return true, n
+		}
+		return false, n
 	},
 	ready: func(c *tanxv1.Cluster) bool {
 		if len(c.Status.Etcd.Status.Members.Ready) == c.Status.Etcd.Status.Size && (c.Status.Etcd.Status.Size == c.Spec.EtcdSpec.Count) {

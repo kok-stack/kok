@@ -134,7 +134,7 @@ func (r *Cluster) ValidateCreate() error {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.image"), r.Spec.ApiServerSpec.Image, "不能为空"))
 	}
 	if r.Spec.ApiServerSpec.Count <= 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), r.Spec.ApiServerSpec.Count, "不能为奇数(必须>=3)"))
+		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), r.Spec.ApiServerSpec.Count, "不能<=0"))
 	}
 	if r.Spec.ControllerManagerSpec.Image == "" {
 		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.image"), r.Spec.ControllerManagerSpec.Image, "不能为空"))
