@@ -16,7 +16,7 @@ import (
 
 const FinalizerName = "finalizer.cluster.kok.tanx"
 
-var modules = []*Module{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule, installPostModule}
+var modules = []*Module{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule}
 var VersionsModules = map[string][]*Module{
 	"1.18.4": modules,
 }
