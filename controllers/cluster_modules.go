@@ -10,16 +10,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const FinalizerName = "finalizer.cluster.kok.tanx"
 
-var modules = []*Module{initModule, etcdModule, apiServerModule, ctrMgtModule, schedulerModule, clientModule}
-var VersionsModules = map[string][]*Module{
-	"1.18.4": modules,
-}
+var VersionsModules = make(map[string][]*Module)
 
 type Object interface {
 	runtime.Object
@@ -33,7 +31,20 @@ func AddModules(key string, m ...*Module) {
 		value = make([]*Module, 0)
 	}
 	value = append(value, m...)
+
+	for i := 0; i < len(value); i++ {
+		for j := 0; j < len(value); j++ {
+			if value[i].Order < value[j].Order {
+				value[i], value[j] = value[j], value[i]
+			}
+		}
+	}
+
 	VersionsModules[key] = value
+	for _, module := range m {
+		v1.RegisterVersionedDefaulters(key, module)
+		v1.RegisterVersionedValidators(key, module)
+	}
 }
 
 type ModuleContext struct {
@@ -48,14 +59,56 @@ func NewModuleContext(context context.Context, c *v1.Cluster, logger logr.Logger
 }
 
 type Module struct {
-	Name string
-	Sub  []*Module
+	Name  string
+	Sub   []*Module
+	Order int
 
-	getObj    func() Object
-	render    func(c *v1.Cluster) Object
-	setStatus func(c *v1.Cluster, target, now Object) (bool, Object)
-	delete    func(ctx context.Context, c *v1.Cluster, client client.Client) error
-	ready     func(c *v1.Cluster) bool
+	GetObj               func() Object
+	Render               func(c *v1.Cluster) Object
+	SetStatus            func(c *v1.Cluster, target, now Object) (bool, Object)
+	Del                  func(ctx context.Context, c *v1.Cluster, client client.Client) error
+	Next                 func(c *v1.Cluster) bool
+	SetDefault           func(c *v1.Cluster)
+	ValidateCreateModule func(c *v1.Cluster) field.ErrorList
+	ValidateUpdateModule func(now *v1.Cluster, old *v1.Cluster) field.ErrorList
+}
+
+func (m *Module) ValidateCreate(c *v1.Cluster) field.ErrorList {
+	if !m.hasSub() {
+		return m.ValidateCreateModule(c)
+	} else {
+		for _, m := range m.Sub {
+			if err := m.ValidateCreate(c); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Module) ValidateUpdate(now *v1.Cluster, old *v1.Cluster) field.ErrorList {
+	if !m.hasSub() {
+		return m.ValidateUpdateModule(now, old)
+	} else {
+		for _, m := range m.Sub {
+			if err := m.ValidateUpdate(now, old); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (m *Module) Default(c *v1.Cluster) {
+	if !m.hasSub() {
+		if m.SetDefault != nil {
+			m.SetDefault(c)
+		}
+	} else {
+		for _, m := range m.Sub {
+			m.Default(c)
+		}
+	}
 }
 
 func (m *Module) Reconcile(ctx *ModuleContext) error {
@@ -91,11 +144,11 @@ func (m *Module) hasSub() bool {
 }
 
 func (m *Module) exist(ctx *ModuleContext) (bool, error) {
-	render := m.render(ctx.Cluster)
+	render := m.Render(ctx.Cluster)
 	err := ctx.Get(ctx, types.NamespacedName{
 		Namespace: ctx.Namespace,
 		Name:      render.GetName(),
-	}, m.getObj())
+	}, m.GetObj())
 	if err != nil && errors.IsNotFound(err) {
 		return false, nil
 	}
@@ -106,8 +159,8 @@ func (m *Module) exist(ctx *ModuleContext) (bool, error) {
 }
 
 func (m *Module) update(ctx *ModuleContext) error {
-	obj := m.getObj()
-	render := m.render(ctx.Cluster)
+	obj := m.GetObj()
+	render := m.Render(ctx.Cluster)
 	if err := ctx.Client.Get(ctx, client.ObjectKey{
 		Namespace: ctx.Namespace,
 		Name:      render.GetName(),
@@ -115,7 +168,7 @@ func (m *Module) update(ctx *ModuleContext) error {
 		return err
 	}
 
-	needUpdate, o := m.setStatus(ctx.Cluster, render, obj)
+	needUpdate, o := m.SetStatus(ctx.Cluster, render, obj)
 	if needUpdate {
 		if err := ctx.Client.Update(ctx.Context, o); err != nil {
 			return err
@@ -125,7 +178,7 @@ func (m *Module) update(ctx *ModuleContext) error {
 }
 
 func (m *Module) create(ctx *ModuleContext) error {
-	render := m.render(ctx.Cluster)
+	render := m.Render(ctx.Cluster)
 	if err := controllerutil.SetControllerReference(ctx.Cluster, render, ctx.Scheme); err != nil {
 		return err
 	}
@@ -142,8 +195,8 @@ func (m *Module) create(ctx *ModuleContext) error {
 
 func (m *Module) Ready(ctx *ModuleContext) bool {
 	if !m.hasSub() {
-		if m.ready != nil {
-			return m.ready(ctx.Cluster)
+		if m.Next != nil {
+			return m.Next(ctx.Cluster)
 		}
 		return true
 	} else {
@@ -158,10 +211,10 @@ func (m *Module) Ready(ctx *ModuleContext) bool {
 
 func (m *Module) Delete(ctx *ModuleContext) error {
 	if !m.hasSub() {
-		if m.delete != nil {
-			err := m.delete(ctx, ctx.Cluster, ctx.Client)
+		if m.Del != nil {
+			err := m.Del(ctx, ctx.Cluster, ctx.Client)
 			if err != nil {
-				ctx.Logger.Error(err, "invoke module delete error")
+				ctx.Logger.Error(err, "invoke module Del error")
 			}
 			return err
 		}

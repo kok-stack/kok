@@ -1,25 +1,32 @@
-package controllers
+package v1
 
 import (
 	"fmt"
 	tanxv1 "github.com/tangxusc/kok/api/v1"
+	"github.com/tangxusc/kok/controllers"
 	v12 "k8s.io/api/apps/v1"
 	v13 "k8s.io/api/batch/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"
 )
 
-var clientModule = &Module{
-	Name: "client-dept",
-	Sub:  []*Module{clientDept, installPostJob},
+func init() {
+	controllers.AddModules(Version, clientModule)
 }
 
-var clientDept = &Module{
-	getObj: func() Object {
+var clientModule = &controllers.Module{
+	Order: 60,
+	Name:  "client-dept",
+	Sub:   []*controllers.Module{clientDept, installPostJob},
+}
+
+var clientDept = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		var rep int32 = 1
 		var termination int64 = 1
 		name := fmt.Sprintf("%s-client", c.Name)
@@ -127,7 +134,7 @@ var clientDept = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		dept := now.(*v12.Deployment)
 		c.Status.Client.Status = dept.Status
 		c.Status.Client.Name = dept.Name
@@ -140,12 +147,31 @@ var clientDept = &Module{
 		}
 		return false, n
 	},
+	SetDefault: func(r *tanxv1.Cluster) {
+		if r.Spec.ClientSpec.Image == "" {
+			r.Spec.ClientSpec.Image = "ccr.ccs.tencentyun.com/k8sonk8s/init:v1"
+		}
+	},
+	ValidateCreateModule: func(r *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if r.Spec.ClientSpec.Image == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clientSpec.count"), r.Spec.ClientSpec.Image, "不能为空"))
+		}
+		return allErrs
+	},
+	ValidateUpdateModule: func(now *tanxv1.Cluster, old *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if now.Spec.ClientSpec.Image != old.Spec.ClientSpec.Image {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clientSpec.count"), now.Spec.ClientSpec.Image, "不允许修改"))
+		}
+		return allErrs
+	},
 }
-var installPostJob = &Module{
-	getObj: func() Object {
+var installPostJob = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v13.Job{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		out := &v13.Job{}
 		out.Name = fmt.Sprintf("%s-install-post", c.Name)
 		out.Namespace = c.Namespace
@@ -244,7 +270,7 @@ var installPostJob = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		job := now.(*v13.Job)
 		c.Status.PostInstall.Status = job.Status
 		c.Status.PostInstall.Name = job.Name

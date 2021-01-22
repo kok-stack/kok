@@ -1,29 +1,36 @@
-package controllers
+package v1
 
 import (
 	"context"
 	"fmt"
 	tanxv1 "github.com/tangxusc/kok/api/v1"
+	"github.com/tangxusc/kok/controllers"
 	v1 "k8s.io/api/batch/v1"
 	v12 "k8s.io/api/core/v1"
 	v13 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"math/big"
 	"net"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var initModule = &Module{
-	Name: "init-job",
-	Sub:  []*Module{InitServiceAccount, InitRoleBinding, InitJob},
+func init() {
+	controllers.AddModules(Version, initModule)
 }
 
-var InitJob = &Module{
-	getObj: func() Object {
+var initModule = &controllers.Module{
+	Order: 10,
+	Name:  "init-job",
+	Sub:   []*controllers.Module{InitServiceAccount, InitRoleBinding, InitJob},
+}
+
+var InitJob = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v1.Job{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		out := &v1.Job{}
 		out.Name = fmt.Sprintf("%s-init", c.Name)
 		out.Namespace = c.Namespace
@@ -97,7 +104,7 @@ var InitJob = &Module{
 
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		job := now.(*v1.Job)
 		c.Status.Init.Status = job.Status
 		c.Status.Init.Name = job.Name
@@ -140,7 +147,7 @@ var InitJob = &Module{
 
 		return false, now
 	},
-	delete: func(ctx context.Context, c *tanxv1.Cluster, client client.Client) error {
+	Del: func(ctx context.Context, c *tanxv1.Cluster, client client.Client) error {
 		var err error
 		nameFunc := []func(cluster *tanxv1.Cluster) string{getCAPkiName, getEtcdPkiClientName, getEtcdPkiServerName, getEtcdPkiPeerName, getServerName, getClientName, getNodeConfigName, getAdminConfigName}
 		for _, namef := range nameFunc {
@@ -156,7 +163,7 @@ var InitJob = &Module{
 		}
 		return err
 	},
-	ready: func(c *tanxv1.Cluster) bool {
+	Next: func(c *tanxv1.Cluster) bool {
 		for _, condition := range c.Status.Init.Status.Conditions {
 			if v1.JobComplete == condition.Type {
 				return true
@@ -214,11 +221,11 @@ func getAdminConfigName(c *tanxv1.Cluster) string {
 	return fmt.Sprintf("%s-admin-config", c.Name)
 }
 
-var InitServiceAccount = &Module{
-	getObj: func() Object {
+var InitServiceAccount = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v12.ServiceAccount{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		out := &v12.ServiceAccount{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-admin", c.Name),
@@ -227,18 +234,18 @@ var InitServiceAccount = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		out := now.(*v12.ServiceAccount)
 		c.Status.Init.ServiceAccountName = out.Name
 		return false, now
 	},
 }
 
-var InitRoleBinding = &Module{
-	getObj: func() Object {
+var InitRoleBinding = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v13.RoleBinding{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		out := &v13.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("%s-admin", c.Name),
@@ -259,9 +266,88 @@ var InitRoleBinding = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		out := now.(*v13.RoleBinding)
 		c.Status.Init.RoleBindingName = out.Name
 		return false, now
+	},
+	SetDefault: func(r *tanxv1.Cluster) {
+		if r.Spec.ClusterDomain == "" {
+			r.Spec.ClusterDomain = "cluster.local"
+		}
+		if r.Spec.ClusterVersion == "" {
+			r.Spec.ClusterVersion = "1.18.4"
+		}
+		if r.Spec.ClusterCIDR == "" {
+			r.Spec.ClusterCIDR = "10.0.0.0/8"
+		}
+		if r.Spec.ServiceClusterIpRange == "" {
+			r.Spec.ServiceClusterIpRange = "10.96.0.0/12"
+		}
+		if len(r.Spec.RegistryMirrors) == 0 {
+			r.Spec.RegistryMirrors = []string{"https://registry.docker-cn.com"}
+		}
+		if r.Spec.InitSpec.Image == "" {
+			r.Spec.InitSpec.Image = "ccr.ccs.tencentyun.com/k8sonk8s/init:v1"
+		}
+		if r.Spec.KubeletSpec.PodInfraContainerImage == "" {
+			r.Spec.KubeletSpec.PodInfraContainerImage = "registry.aliyuncs.com/google_containers/pause:3.1"
+		}
+		if r.Spec.KubeProxySpec.BindAddress == "" {
+			r.Spec.KubeProxySpec.BindAddress = "0.0.0.0"
+		}
+	},
+	ValidateCreateModule: func(r *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if r.Spec.ClusterDomain == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDomain"), r.Spec.ClusterDomain, "不能为空"))
+		}
+		if r.Spec.ClusterVersion == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterVersion"), r.Spec.ClusterVersion, "不能为空"))
+		}
+		if r.Spec.ClusterCIDR == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterCIDR"), r.Spec.ClusterCIDR, "不能为空"))
+		}
+		if r.Spec.ServiceClusterIpRange == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.serviceClusterIpRange"), r.Spec.ServiceClusterIpRange, "不能为空"))
+		}
+		if len(r.Spec.RegistryMirrors) == 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.registryMirrors"), r.Spec.RegistryMirrors, "不能为空"))
+		}
+		if r.Spec.InitSpec.Image == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.initSpec.image"), r.Spec.InitSpec.Image, "不能为空"))
+		}
+		if r.Spec.KubeletSpec.PodInfraContainerImage == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeletSpec.podInfraContainerImage"), r.Spec.KubeletSpec.PodInfraContainerImage, "不能为空"))
+		}
+		if r.Spec.KubeProxySpec.BindAddress == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeProxySpec.bindAddress"), r.Spec.KubeProxySpec.BindAddress, "不能为空"))
+		}
+		return allErrs
+	},
+	ValidateUpdateModule: func(now *tanxv1.Cluster, old *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if now.Spec.ClusterDomain != old.Spec.ClusterDomain {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDomain"), now.Spec.ClusterDomain, "不允许修改"))
+		}
+		if now.Spec.ClusterVersion != old.Spec.ClusterVersion {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterVersion"), now.Spec.ClusterVersion, "不允许修改"))
+		}
+		if now.Spec.ClusterCIDR != old.Spec.ClusterCIDR {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterCIDR"), now.Spec.ClusterCIDR, "不允许修改"))
+		}
+		if now.Spec.ServiceClusterIpRange != old.Spec.ServiceClusterIpRange {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.serviceClusterIpRange"), now.Spec.ServiceClusterIpRange, "不允许修改"))
+		}
+		if now.Spec.InitSpec.Image != old.Spec.InitSpec.Image {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.initSpec.image"), now.Spec.InitSpec.Image, "不允许修改"))
+		}
+		if now.Spec.KubeletSpec.PodInfraContainerImage != old.Spec.KubeletSpec.PodInfraContainerImage {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeletSpec.podInfraContainerImage"), now.Spec.KubeletSpec.PodInfraContainerImage, "不允许修改"))
+		}
+		if now.Spec.KubeProxySpec.BindAddress != old.Spec.KubeProxySpec.BindAddress {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeProxySpec.bindAddress"), now.Spec.KubeProxySpec.BindAddress, "不允许修改"))
+		}
+		return allErrs
 	},
 }

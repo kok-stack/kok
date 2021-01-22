@@ -40,8 +40,7 @@ type ClusterInitSpec struct {
 }
 
 type ClusterEtcdSpec struct {
-	Count     int `json:"count"`
-	ImageBase `json:",inline"`
+	Count int `json:"count"`
 }
 
 type ClusterApiServerSpec struct {
@@ -72,6 +71,7 @@ type ClusterKubeProxySpec struct {
 }
 
 //TODO: 组件 就绪/存活探针
+
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	ClusterDomain         string                       `json:"clusterDomain,omitempty"`

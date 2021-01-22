@@ -17,12 +17,15 @@ limitations under the License.
 package v1
 
 import (
+	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"strconv"
+	"strings"
 )
 
 // log is for logging in this package.
@@ -40,61 +43,78 @@ func (r *Cluster) SetupWebhookWithManager(mgr ctrl.Manager) error {
 
 var _ webhook.Defaulter = &Cluster{}
 
+//+kubebuilder:object:generate:=false
+//+kubebuilder:object:root:=false
+type ClusterValidator interface {
+	ValidateCreate(c *Cluster) field.ErrorList
+	ValidateUpdate(now *Cluster, old *Cluster) field.ErrorList
+}
+
+//+kubebuilder:object:generate:=false
+//+kubebuilder:object:root:=false
+type ClusterDefaulter interface {
+	Default(c *Cluster)
+}
+
+var VersionedValidators = map[string][]ClusterValidator{}
+var VersionedDefaulters = map[string][]ClusterDefaulter{}
+
+func RegisterVersionedValidators(version string, o ClusterValidator) {
+	setMaxVersion(version)
+	value, ok := VersionedValidators[version]
+	if !ok {
+		value = make([]ClusterValidator, 0)
+	}
+	value = append(value, o)
+	VersionedValidators[version] = value
+}
+
+func setMaxVersion(version string) {
+	if maxVersion == "" {
+		maxVersion = version
+		return
+	}
+	now, err := strconv.Atoi(strings.ReplaceAll(version, ".", ""))
+	if err != nil {
+		return
+	}
+	old, err := strconv.Atoi(strings.ReplaceAll(maxVersion, ".", ""))
+	if err != nil {
+		return
+	}
+	if now > old {
+		maxVersion = version
+	}
+	fmt.Println("maxVersion:", maxVersion)
+}
+
+func RegisterVersionedDefaulters(version string, o ClusterDefaulter) {
+	value, ok := VersionedDefaulters[version]
+	if !ok {
+		value = make([]ClusterDefaulter, 0)
+	}
+	value = append(value, o)
+	VersionedDefaulters[version] = value
+}
+
+var maxVersion = ""
+
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Cluster) Default() {
 	clusterlog.Info("default", "name", r.Name)
 
-	if r.Spec.ClusterDomain == "" {
-		r.Spec.ClusterDomain = "cluster.local"
+	v := getVersion(r.Spec.ClusterVersion)
+	defaulters := VersionedDefaulters[v]
+	for _, defaulter := range defaulters {
+		defaulter.Default(r)
 	}
-	if r.Spec.ClusterVersion == "" {
-		r.Spec.ClusterVersion = "1.18.4"
+}
+
+func getVersion(version string) string {
+	if version != "" {
+		return version
 	}
-	if r.Spec.ClusterCIDR == "" {
-		r.Spec.ClusterCIDR = "10.0.0.0/8"
-	}
-	if r.Spec.ServiceClusterIpRange == "" {
-		r.Spec.ServiceClusterIpRange = "10.96.0.0/12"
-	}
-	if len(r.Spec.RegistryMirrors) == 0 {
-		r.Spec.RegistryMirrors = []string{"https://registry.docker-cn.com"}
-	}
-	if r.Spec.InitSpec.Image == "" {
-		r.Spec.InitSpec.Image = "ccr.ccs.tencentyun.com/k8sonk8s/init:v1"
-	}
-	if r.Spec.EtcdSpec.Image == "" {
-		r.Spec.EtcdSpec.Image = "registry.aliyuncs.com/google_containers/etcd:3.3.10"
-	}
-	if r.Spec.EtcdSpec.Count == 0 {
-		r.Spec.EtcdSpec.Count = 3
-	}
-	if r.Spec.ApiServerSpec.Image == "" {
-		r.Spec.ApiServerSpec.Image = "registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.4"
-	}
-	if r.Spec.ApiServerSpec.Count == 0 {
-		r.Spec.ApiServerSpec.Count = 3
-	}
-	if r.Spec.ControllerManagerSpec.Image == "" {
-		r.Spec.ControllerManagerSpec.Image = "registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.4"
-	}
-	if r.Spec.ControllerManagerSpec.Count == 0 {
-		r.Spec.ControllerManagerSpec.Count = 1
-	}
-	if r.Spec.SchedulerSpec.Image == "" {
-		r.Spec.SchedulerSpec.Image = "registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4"
-	}
-	if r.Spec.SchedulerSpec.Count == 0 {
-		r.Spec.SchedulerSpec.Count = 1
-	}
-	if r.Spec.ClientSpec.Image == "" {
-		r.Spec.ClientSpec.Image = "ccr.ccs.tencentyun.com/k8sonk8s/init:v1"
-	}
-	if r.Spec.KubeletSpec.PodInfraContainerImage == "" {
-		r.Spec.KubeletSpec.PodInfraContainerImage = "registry.aliyuncs.com/google_containers/pause:3.1"
-	}
-	if r.Spec.KubeProxySpec.BindAddress == "" {
-		r.Spec.KubeProxySpec.BindAddress = "0.0.0.0"
-	}
+	return maxVersion
 }
 
 // +kubebuilder:webhook:verbs=create;update,path=/validate-cluster-kok-tanx-v1-cluster,mutating=false,failurePolicy=fail,groups=cluster.kok.tanx,resources=clusters,versions=v1,name=vcluster.kb.io
@@ -106,56 +126,10 @@ func (r *Cluster) ValidateCreate() error {
 	clusterlog.Info("validate create", "name", r.Name)
 	var allErrs field.ErrorList
 
-	if r.Spec.ClusterDomain == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDomain"), r.Spec.ClusterDomain, "不能为空"))
-	}
-	if r.Spec.ClusterVersion == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterVersion"), r.Spec.ClusterVersion, "不能为空"))
-	}
-	if r.Spec.ClusterCIDR == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterCIDR"), r.Spec.ClusterCIDR, "不能为空"))
-	}
-	if r.Spec.ServiceClusterIpRange == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.serviceClusterIpRange"), r.Spec.ServiceClusterIpRange, "不能为空"))
-	}
-	if len(r.Spec.RegistryMirrors) == 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.registryMirrors"), r.Spec.RegistryMirrors, "不能为空"))
-	}
-	if r.Spec.InitSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.initSpec.image"), r.Spec.InitSpec.Image, "不能为空"))
-	}
-	if r.Spec.EtcdSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.etcdSpec.image"), r.Spec.EtcdSpec.Image, "不能为空"))
-	}
-	if r.Spec.EtcdSpec.Count%2 == 0 || r.Spec.EtcdSpec.Count < 3 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.etcdSpec.count"), r.Spec.EtcdSpec.Count, "不能为奇数(必须>=3)"))
-	}
-	if r.Spec.ApiServerSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.image"), r.Spec.ApiServerSpec.Image, "不能为空"))
-	}
-	if r.Spec.ApiServerSpec.Count <= 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), r.Spec.ApiServerSpec.Count, "不能<=0"))
-	}
-	if r.Spec.ControllerManagerSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.image"), r.Spec.ControllerManagerSpec.Image, "不能为空"))
-	}
-	if r.Spec.ControllerManagerSpec.Count%2 == 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.count"), r.Spec.ControllerManagerSpec.Count, "不能为奇数"))
-	}
-	if r.Spec.SchedulerSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.image"), r.Spec.SchedulerSpec.Image, "不能为空"))
-	}
-	if r.Spec.SchedulerSpec.Count%2 == 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.count"), r.Spec.SchedulerSpec.Count, "不能为奇数"))
-	}
-	if r.Spec.ClientSpec.Image == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clientSpec.count"), r.Spec.ClientSpec.Image, "不能为空"))
-	}
-	if r.Spec.KubeletSpec.PodInfraContainerImage == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeletSpec.podInfraContainerImage"), r.Spec.KubeletSpec.PodInfraContainerImage, "不能为空"))
-	}
-	if r.Spec.KubeProxySpec.BindAddress == "" {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeProxySpec.bindAddress"), r.Spec.KubeProxySpec.BindAddress, "不能为空"))
+	validators := VersionedValidators[r.Spec.ClusterVersion]
+	for _, v := range validators {
+
+		allErrs = append(allErrs, v.ValidateCreate(r)...)
 	}
 
 	if len(allErrs) == 0 {
@@ -170,54 +144,12 @@ func (r *Cluster) ValidateUpdate(old runtime.Object) error {
 	oldC := old.(*Cluster)
 	var allErrs field.ErrorList
 
-	if r.Spec.ClusterDomain != oldC.Spec.ClusterDomain {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterDomain"), oldC.Spec.ClusterDomain, "不允许修改"))
+	validators := VersionedValidators[r.Spec.ClusterVersion]
+	for _, v := range validators {
+
+		allErrs = append(allErrs, v.ValidateUpdate(oldC, r)...)
 	}
-	if r.Spec.ClusterVersion != oldC.Spec.ClusterVersion {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterVersion"), oldC.Spec.ClusterVersion, "不允许修改"))
-	}
-	if r.Spec.ClusterCIDR != oldC.Spec.ClusterCIDR {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clusterCIDR"), oldC.Spec.ClusterCIDR, "不允许修改"))
-	}
-	if r.Spec.ServiceClusterIpRange != oldC.Spec.ServiceClusterIpRange {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.serviceClusterIpRange"), oldC.Spec.ServiceClusterIpRange, "不允许修改"))
-	}
-	if r.Spec.InitSpec.Image != oldC.Spec.InitSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.initSpec.image"), oldC.Spec.InitSpec.Image, "不允许修改"))
-	}
-	if r.Spec.EtcdSpec.Image != oldC.Spec.EtcdSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.etcdSpec.image"), oldC.Spec.EtcdSpec.Image, "不允许修改"))
-	}
-	if oldC.Spec.EtcdSpec.Count%2 == 0 || oldC.Spec.EtcdSpec.Count < 3 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.etcdSpec.count"), oldC.Spec.EtcdSpec.Count, "不能为奇数(必须>=3)"))
-	}
-	if r.Spec.ApiServerSpec.Image != oldC.Spec.ApiServerSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.image"), oldC.Spec.ApiServerSpec.Image, "不允许修改"))
-	}
-	if oldC.Spec.ApiServerSpec.Count < 3 || oldC.Spec.ApiServerSpec.Count%2 == 0 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), oldC.Spec.ApiServerSpec.Count, "不能为奇数(必须>=3)"))
-	}
-	if oldC.Spec.ControllerManagerSpec.Image != oldC.Spec.ControllerManagerSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.image"), oldC.Spec.ControllerManagerSpec.Image, "不允许修改"))
-	}
-	if oldC.Spec.ControllerManagerSpec.Count%2 == 0 || oldC.Spec.ControllerManagerSpec.Count < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.count"), oldC.Spec.ControllerManagerSpec.Count, "不能为奇数(必须>=1)"))
-	}
-	if r.Spec.SchedulerSpec.Image != oldC.Spec.SchedulerSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.image"), oldC.Spec.SchedulerSpec.Image, "不允许修改"))
-	}
-	if oldC.Spec.SchedulerSpec.Count%2 == 0 || oldC.Spec.SchedulerSpec.Count < 1 {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.count"), oldC.Spec.SchedulerSpec.Count, "不能为奇数(必须>=1)"))
-	}
-	if oldC.Spec.ClientSpec.Image != oldC.Spec.ClientSpec.Image {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.clientSpec.count"), oldC.Spec.ClientSpec.Image, "不允许修改"))
-	}
-	if r.Spec.KubeletSpec.PodInfraContainerImage != oldC.Spec.KubeletSpec.PodInfraContainerImage {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeletSpec.podInfraContainerImage"), oldC.Spec.KubeletSpec.PodInfraContainerImage, "不允许修改"))
-	}
-	if r.Spec.KubeProxySpec.BindAddress != oldC.Spec.KubeProxySpec.BindAddress {
-		allErrs = append(allErrs, field.Invalid(field.NewPath("spec.kubeProxySpec.bindAddress"), oldC.Spec.KubeProxySpec.BindAddress, "不允许修改"))
-	}
+
 	if len(allErrs) == 0 {
 		return nil
 	}

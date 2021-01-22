@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	vs1 "github.com/tangxusc/kok/versions/v1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -52,6 +53,7 @@ func init() {
 
 	_ = clusterv1.AddToScheme(scheme)
 	_ = clusterv1.EtcdAddToScheme(scheme)
+	_ = vs1.Version
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -65,6 +67,15 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+
+	fmt.Println("目前支持的版本情况:")
+	for v, modules := range controllers.VersionsModules {
+		names := make([]string, len(modules))
+		for i, module := range modules {
+			names[i] = module.Name
+		}
+		fmt.Printf("版本:%s,模块[%s]\n", v, strings.Join(names, ","))
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

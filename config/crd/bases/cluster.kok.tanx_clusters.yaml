@@ -58,8 +58,7 @@ spec:
         metadata:
           type: object
         spec:
-          description: 'TODO: 组件 就绪/存活探针 ClusterSpec defines the desired state of
-            Cluster'
+          description: ClusterSpec defines the desired state of Cluster
           properties:
             access:
               properties:
@@ -110,11 +109,8 @@ spec:
               properties:
                 count:
                   type: integer
-                image:
-                  type: string
               required:
               - count
-              - image
               type: object
             init:
               properties:

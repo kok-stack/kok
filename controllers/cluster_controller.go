@@ -42,7 +42,7 @@ type ClusterReconciler struct {
 	Recorder record.EventRecorder
 }
 
-// +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters,verbs=get;list;watch;create;update;patch;Del
 // +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=cluster.kok.tanx,resources=clusters/events,verbs=get;list;watch;create;update;patch
 func (r *ClusterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
@@ -74,10 +74,10 @@ func deleteCluster(ctx *ModuleContext) (ctrl.Result, error) {
 		moduleString := fmt.Sprintf("[%v/%v]%s ", index+1, total, moduleName)
 		if err := module.Delete(ctx); err != nil {
 			ctx.Recorder.Event(ctx, v13.EventTypeWarning, "ModuleDeleteError", fmt.Sprintf("[%s] Error:%v", moduleName, err))
-			ctx.Info(moduleString+"module delete error", "error", err)
+			ctx.Info(moduleString+"module Del error", "error", err)
 			return ctrl.Result{}, err
 		}
-		ctx.Info(moduleString + "module delete success")
+		ctx.Info(moduleString + "module Del success")
 	}
 
 	ctx.SetFinalizers([]string{})
@@ -86,7 +86,7 @@ func deleteCluster(ctx *ModuleContext) (ctrl.Result, error) {
 		ctx.Info("remove Finalizers error", "error", err)
 		return ctrl.Result{}, err
 	}
-	ctx.Info("delete cluster finish", "name", ctx.Name, "namespace", ctx.Namespace)
+	ctx.Info("Del cluster finish", "name", ctx.Name, "namespace", ctx.Namespace)
 
 	return ctrl.Result{}, nil
 }

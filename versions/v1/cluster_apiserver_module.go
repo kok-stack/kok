@@ -1,24 +1,31 @@
-package controllers
+package v1
 
 import (
 	"fmt"
 	tanxv1 "github.com/tangxusc/kok/api/v1"
+	"github.com/tangxusc/kok/controllers"
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"
 )
 
-var apiServerModule = &Module{
-	Name: "apiserver-dept",
-	Sub:  []*Module{apiServerDept, apiServerSvc},
+func init() {
+	controllers.AddModules(Version, apiServerModule)
 }
 
-var apiServerDept = &Module{
-	getObj: func() Object {
+var apiServerModule = &controllers.Module{
+	Order: 30,
+	Name:  "apiserver-dept",
+	Sub:   []*controllers.Module{apiServerDept, apiServerSvc},
+}
+
+var apiServerDept = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v12.Deployment{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		var rep = c.Spec.ApiServerSpec.Count
 		name := fmt.Sprintf("%s-apiserver", c.Name)
 		var out = &v12.Deployment{
@@ -123,7 +130,7 @@ var apiServerDept = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		dept := now.(*v12.Deployment)
 		c.Status.ApiServer.Status = dept.Status
 		c.Status.ApiServer.Name = dept.Name
@@ -136,7 +143,7 @@ var apiServerDept = &Module{
 		}
 		return false, n
 	},
-	ready: func(c *tanxv1.Cluster) bool {
+	Next: func(c *tanxv1.Cluster) bool {
 		for _, condition := range c.Status.ApiServer.Status.Conditions {
 			if v12.DeploymentAvailable == condition.Type {
 				return true
@@ -144,13 +151,41 @@ var apiServerDept = &Module{
 		}
 		return false
 	},
+	SetDefault: func(r *tanxv1.Cluster) {
+		if r.Spec.ApiServerSpec.Image == "" {
+			r.Spec.ApiServerSpec.Image = "registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.4"
+		}
+		if r.Spec.ApiServerSpec.Count == 0 {
+			r.Spec.ApiServerSpec.Count = 3
+		}
+	},
+	ValidateCreateModule: func(r *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if r.Spec.ApiServerSpec.Image == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.image"), r.Spec.ApiServerSpec.Image, "不能为空"))
+		}
+		if r.Spec.ApiServerSpec.Count <= 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), r.Spec.ApiServerSpec.Count, "必须>0"))
+		}
+		return allErrs
+	},
+	ValidateUpdateModule: func(now *tanxv1.Cluster, old *tanxv1.Cluster) field.ErrorList {
+		var allErrs field.ErrorList
+		if now.Spec.ApiServerSpec.Image != old.Spec.ApiServerSpec.Image {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.image"), now.Spec.ApiServerSpec.Image, "不允许修改"))
+		}
+		if now.Spec.ApiServerSpec.Count < 0 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.apiServerSpec.count"), now.Spec.ApiServerSpec.Count, "必须>0"))
+		}
+		return allErrs
+	},
 }
 
-var apiServerSvc = &Module{
-	getObj: func() Object {
+var apiServerSvc = &controllers.Module{
+	GetObj: func() controllers.Object {
 		return &v1.Service{}
 	},
-	render: func(c *tanxv1.Cluster) Object {
+	Render: func(c *tanxv1.Cluster) controllers.Object {
 		name := fmt.Sprintf("%s-apiserver", c.Name)
 		out := &v1.Service{
 			ObjectMeta: metav1.ObjectMeta{
@@ -173,7 +208,7 @@ var apiServerSvc = &Module{
 		}
 		return out
 	},
-	setStatus: func(c *tanxv1.Cluster, target, now Object) (bool, Object) {
+	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		svc := now.(*v1.Service)
 		c.Status.ApiServer.SvcName = svc.Name
 
