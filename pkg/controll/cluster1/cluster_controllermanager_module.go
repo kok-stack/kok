@@ -1,4 +1,4 @@
-package v1
+package cluster1
 
 import (
 	"fmt"
@@ -12,22 +12,22 @@ import (
 )
 
 func init() {
-	controllers.AddModules(Version, schedulerModule)
+	controllers.AddModules(Version, ctrMgtModule)
 }
 
-var schedulerModule = &controllers.Module{
-	Order: 50,
-	Name:  "scheduler-dept",
-	Sub:   []*controllers.Module{schedulerDept},
+var ctrMgtModule = &controllers.Module{
+	Order: 40,
+	Name:  "controllerManager-dept",
+	Sub:   []*controllers.Module{controllerMgrDept},
 }
 
-var schedulerDept = &controllers.Module{
+var controllerMgrDept = &controllers.Module{
 	GetObj: func() controllers.Object {
 		return &v12.Deployment{}
 	},
 	Render: func(c *tanxv1.Cluster) controllers.Object {
-		var rep = c.Spec.SchedulerSpec.Count
-		name := fmt.Sprintf("%s-scheduler", c.Name)
+		var rep = c.Spec.ControllerManagerSpec.Count
+		name := fmt.Sprintf("%s-controller-manager", c.Name)
 		var out = &v12.Deployment{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
@@ -47,15 +47,28 @@ var schedulerDept = &controllers.Module{
 					Spec: v1.PodSpec{
 						Containers: []v1.Container{
 							{
-								Name:  "scheduler",
-								Image: c.Spec.SchedulerSpec.Image,
+								Name:  "controller-manager",
+								Image: c.Spec.ControllerManagerSpec.Image,
 								Command: []string{
-									"kube-scheduler",
-									"--kubeconfig=/pki/config/admin.config",
+									"kube-controller-manager",
+									"--allocate-node-cidrs=true",
 									"--authentication-kubeconfig=/pki/config/admin.config",
 									"--authorization-kubeconfig=/pki/config/admin.config",
+									"--bind-address=127.0.0.1",
+									"--client-ca-file=/pki/ca/ca.pem",
+									fmt.Sprintf("--cluster-cidr=%s", c.Spec.ClusterCIDR),
+									"--cluster-signing-cert-file=/pki/ca/ca.pem",
+									"--cluster-signing-key-file=/pki/ca/ca-key.pem",
+									"--controllers=*,bootstrapsigner,tokencleaner",
+									"--kubeconfig=/pki/config/admin.config",
 									"--leader-elect=true",
+									//TODO:指定node-cidr-mask-size
+									"--node-cidr-mask-size=24",
 									"--requestheader-client-ca-file=/pki/ca/ca.pem",
+									"--root-ca-file=/pki/ca/ca.pem",
+									"--service-account-private-key-file=/pki/server/kubernetes-server-key.pem",
+									fmt.Sprintf("--service-cluster-ip-range=%s", c.Spec.ServiceClusterIpRange),
+									"--use-service-account-credentials=true",
 								},
 								VolumeMounts: []v1.VolumeMount{
 									{
@@ -107,8 +120,8 @@ var schedulerDept = &controllers.Module{
 	},
 	SetStatus: func(c *tanxv1.Cluster, target, now controllers.Object) (bool, controllers.Object) {
 		dept := now.(*v12.Deployment)
-		c.Status.Scheduler.Status = dept.Status
-		c.Status.Scheduler.Name = dept.Name
+		c.Status.ControllerManager.Status = dept.Status
+		c.Status.ControllerManager.Name = dept.Name
 
 		t := target.(*v12.Deployment)
 		n := now.(*v12.Deployment)
@@ -119,30 +132,30 @@ var schedulerDept = &controllers.Module{
 		return false, n
 	},
 	SetDefault: func(r *tanxv1.Cluster) {
-		if r.Spec.SchedulerSpec.Image == "" {
-			r.Spec.SchedulerSpec.Image = "registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4"
+		if r.Spec.ControllerManagerSpec.Image == "" {
+			r.Spec.ControllerManagerSpec.Image = "registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.4"
 		}
-		if r.Spec.SchedulerSpec.Count == 0 {
-			r.Spec.SchedulerSpec.Count = 1
+		if r.Spec.ControllerManagerSpec.Count == 0 {
+			r.Spec.ControllerManagerSpec.Count = 1
 		}
 	},
 	ValidateCreateModule: func(r *tanxv1.Cluster) field.ErrorList {
 		var allErrs field.ErrorList
-		if r.Spec.SchedulerSpec.Image == "" {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.image"), r.Spec.SchedulerSpec.Image, "不能为空"))
+		if r.Spec.ControllerManagerSpec.Image == "" {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.image"), r.Spec.ControllerManagerSpec.Image, "不能为空"))
 		}
-		if r.Spec.SchedulerSpec.Count < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.count"), r.Spec.SchedulerSpec.Count, "必须>1"))
+		if r.Spec.ControllerManagerSpec.Count < 1 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.count"), r.Spec.ControllerManagerSpec.Count, "不能<1"))
 		}
 		return allErrs
 	},
 	ValidateUpdateModule: func(now *tanxv1.Cluster, old *tanxv1.Cluster) field.ErrorList {
 		var allErrs field.ErrorList
-		if now.Spec.SchedulerSpec.Image != old.Spec.SchedulerSpec.Image {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.image"), now.Spec.SchedulerSpec.Image, "不允许修改"))
+		if now.Spec.ControllerManagerSpec.Image != old.Spec.ControllerManagerSpec.Image {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.image"), now.Spec.ControllerManagerSpec.Image, "不允许修改"))
 		}
-		if now.Spec.SchedulerSpec.Count < 1 {
-			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.schedulerSpec.count"), now.Spec.SchedulerSpec.Count, "必须>1"))
+		if now.Spec.ControllerManagerSpec.Count < 1 {
+			allErrs = append(allErrs, field.Invalid(field.NewPath("spec.controllerManagerSpec.count"), now.Spec.ControllerManagerSpec.Count, "不能<1"))
 		}
 		return allErrs
 	},
