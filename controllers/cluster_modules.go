@@ -75,6 +75,9 @@ type Module struct {
 
 func (m *Module) ValidateCreate(c *v1.Cluster) field.ErrorList {
 	if !m.hasSub() {
+		if m.ValidateCreateModule == nil {
+			return nil
+		}
 		return m.ValidateCreateModule(c)
 	} else {
 		for _, m := range m.Sub {
@@ -88,6 +91,9 @@ func (m *Module) ValidateCreate(c *v1.Cluster) field.ErrorList {
 
 func (m *Module) ValidateUpdate(now *v1.Cluster, old *v1.Cluster) field.ErrorList {
 	if !m.hasSub() {
+		if m.ValidateUpdateModule == nil {
+			return nil
+		}
 		return m.ValidateUpdateModule(now, old)
 	} else {
 		for _, m := range m.Sub {

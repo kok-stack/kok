@@ -19,7 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	vs1 "github.com/tangxusc/kok/pkg/controll/cluster1"
+	vs1 "github.com/tangxusc/kok/controllers/cluster1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
