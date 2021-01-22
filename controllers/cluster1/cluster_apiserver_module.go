@@ -7,6 +7,7 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"
 )
@@ -72,6 +73,47 @@ var apiServerDept = &controllers.Module{
 									Name:          "https-6443",
 									ContainerPort: 6443,
 								}},
+								LivenessProbe: &v1.Probe{
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    8,
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/livez",
+											Port:   intstr.FromInt(6443),
+											Scheme: "HTTPS",
+										},
+									},
+								},
+								ReadinessProbe: &v1.Probe{
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/readyz",
+											Port:   intstr.FromInt(6443),
+											Scheme: "HTTPS",
+										},
+									},
+									TimeoutSeconds:   15,
+									PeriodSeconds:    1,
+									SuccessThreshold: 1,
+									FailureThreshold: 3,
+								},
+								StartupProbe: &v1.Probe{
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/livez",
+											Port:   intstr.FromInt(6443),
+											Scheme: "HTTPS",
+										},
+									},
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    24,
+								},
 								VolumeMounts: []v1.VolumeMount{
 									{
 										Name:      "ca-pki",

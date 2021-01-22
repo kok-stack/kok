@@ -7,6 +7,7 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"
 )
@@ -56,6 +57,36 @@ var schedulerDept = &controllers.Module{
 									"--authorization-kubeconfig=/pki/config/admin.config",
 									"--leader-elect=true",
 									"--requestheader-client-ca-file=/pki/ca/ca.pem",
+								},
+								LivenessProbe: &v1.Probe{
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    8,
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/healthz",
+											Port:   intstr.FromInt(10259),
+											Scheme: "HTTPS",
+											Host:   "127.0.0.1",
+										},
+									},
+								},
+								StartupProbe: &v1.Probe{
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/healthz",
+											Port:   intstr.FromInt(10259),
+											Scheme: "HTTPS",
+											Host:   "127.0.0.1",
+										},
+									},
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    24,
 								},
 								VolumeMounts: []v1.VolumeMount{
 									{

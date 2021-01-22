@@ -7,6 +7,7 @@ import (
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"
 )
@@ -69,6 +70,36 @@ var controllerMgrDept = &controllers.Module{
 									"--service-account-private-key-file=/pki/server/kubernetes-server-key.pem",
 									fmt.Sprintf("--service-cluster-ip-range=%s", c.Spec.ServiceClusterIpRange),
 									"--use-service-account-credentials=true",
+								},
+								LivenessProbe: &v1.Probe{
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    8,
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/healthz",
+											Port:   intstr.FromInt(10257),
+											Scheme: "HTTPS",
+											Host:   "127.0.0.1",
+										},
+									},
+								},
+								StartupProbe: &v1.Probe{
+									Handler: v1.Handler{
+										HTTPGet: &v1.HTTPGetAction{
+											Path:   "/healthz",
+											Port:   intstr.FromInt(10257),
+											Scheme: "HTTPS",
+											Host:   "127.0.0.1",
+										},
+									},
+									InitialDelaySeconds: 10,
+									TimeoutSeconds:      15,
+									PeriodSeconds:       10,
+									SuccessThreshold:    1,
+									FailureThreshold:    24,
 								},
 								VolumeMounts: []v1.VolumeMount{
 									{
