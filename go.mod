@@ -1,4 +1,4 @@
-module github.com/tangxusc/kok
+module github.com/kok-stack/kok
 
 go 1.13
 
