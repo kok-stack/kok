@@ -3,8 +3,8 @@ package cluster1
 import (
 	"context"
 	"fmt"
-	tanxv1 "github.com/tangxusc/kok/api/v1"
-	"github.com/tangxusc/kok/controllers"
+	tanxv1 "github.com/kok-stack/kok/api/v1"
+	"github.com/kok-stack/kok/controllers"
 	v1 "k8s.io/api/batch/v1"
 	v12 "k8s.io/api/core/v1"
 	v13 "k8s.io/api/rbac/v1"

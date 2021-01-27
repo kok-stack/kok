@@ -31,7 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	clusterv1 "github.com/tangxusc/kok/api/v1"
+	clusterv1 "github.com/kok-stack/kok/api/v1"
 )
 
 // ClusterReconciler reconciles a Cluster object

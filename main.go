@@ -19,7 +19,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	vs1 "github.com/tangxusc/kok/controllers/cluster1"
+	vs1 "github.com/kok-stack/kok/controllers/cluster1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -38,8 +38,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	clusterv1 "github.com/tangxusc/kok/api/v1"
-	"github.com/tangxusc/kok/controllers"
+	clusterv1 "github.com/kok-stack/kok/api/v1"
+	"github.com/kok-stack/kok/controllers"
 	// +kubebuilder:scaffold:imports
 )
 

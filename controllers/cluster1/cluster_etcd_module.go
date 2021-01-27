@@ -3,8 +3,8 @@ package cluster1
 import (
 	"fmt"
 	"github.com/coreos/etcd-operator/pkg/apis/etcd/v1beta2"
-	tanxv1 "github.com/tangxusc/kok/api/v1"
-	"github.com/tangxusc/kok/controllers"
+	tanxv1 "github.com/kok-stack/kok/api/v1"
+	"github.com/kok-stack/kok/controllers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	"reflect"

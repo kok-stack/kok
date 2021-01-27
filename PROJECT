@@ -1,5 +1,5 @@
 domain: kok.tanx
-repo: github.com/tangxusc/kok
+repo: github.com/kok-stack/kok
 resources:
 - group: cluster
   kind: Cluster

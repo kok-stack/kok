@@ -2,8 +2,8 @@ package cluster1
 
 import (
 	"fmt"
-	tanxv1 "github.com/tangxusc/kok/api/v1"
-	"github.com/tangxusc/kok/controllers"
+	tanxv1 "github.com/kok-stack/kok/api/v1"
+	"github.com/kok-stack/kok/controllers"
 	v12 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

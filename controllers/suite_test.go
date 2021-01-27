@@ -30,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	clusterv1 "github.com/tangxusc/kok/api/v1"
+	clusterv1 "github.com/kok-stack/kok/api/v1"
 	// +kubebuilder:scaffold:imports
 )
 
