@@ -161,7 +161,7 @@ EOF
 
 cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=kubernetes k8s-server-csr.json | cfssljson -bare kubernetes-server
 
-kubectl config --kubeconfig=admin.config set-cluster kubernetes --certificate-authority=/home/test/ca.pem --embed-certs=true --server=https://"${APISERVER_ADDRESS}":6443
+kubectl config --kubeconfig=admin.config set-cluster kubernetes --certificate-authority=/home/test/ca.pem --embed-certs=true --server=https://"${APISERVER_ADDRESS}"."${NAMESPACE}":6443
 kubectl config --kubeconfig=admin.config set-credentials kubernetes-admin --embed-certs=true --client-certificate=/home/test/kubernetes-server.pem --client-key=/home/test/kubernetes-server-key.pem
 kubectl config --kubeconfig=admin.config set-context kubernetes --cluster=kubernetes --namespace=default --user=kubernetes-admin
 kubectl config --kubeconfig=admin.config set current-context kubernetes
