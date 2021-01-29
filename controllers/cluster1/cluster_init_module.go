@@ -165,7 +165,7 @@ var InitJob = &controllers.Module{
 	},
 	Next: func(c *tanxv1.Cluster) bool {
 		for _, condition := range c.Status.Init.Status.Conditions {
-			if v1.JobComplete == condition.Type {
+			if v1.JobComplete == condition.Type && v12.ConditionTrue == condition.Status {
 				return true
 			}
 		}

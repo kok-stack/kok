@@ -187,7 +187,7 @@ var apiServerDept = &controllers.Module{
 	},
 	Next: func(c *tanxv1.Cluster) bool {
 		for _, condition := range c.Status.ApiServer.Status.Conditions {
-			if v12.DeploymentAvailable == condition.Type {
+			if v12.DeploymentAvailable == condition.Type && v1.ConditionTrue == condition.Status {
 				return true
 			}
 		}
