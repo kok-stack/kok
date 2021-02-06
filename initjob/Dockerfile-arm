@@ -1,4 +1,4 @@
-FROM ubuntu:de14ad04333bd13b67be947c47b9a61cf2ebd6715f5aae4f8dd59e23c074bde3
+FROM ubuntu
 RUN apt update && apt install wget -y
 RUN wget -O kubernetes-server-linux-arm.tar.gz https://dl.k8s.io/v1.18.4/kubernetes-server-linux-arm.tar.gz && tar -zxvf kubernetes-server-linux-arm.tar.gz && rm kubernetes-server-linux-arm.tar.gz
 RUN wget -O /usr/bin/cfssl https://pkg.cfssl.org/R1.2/cfssl_linux-arm && wget -O /usr/bin/cfssljson https://pkg.cfssl.org/R1.2/cfssljson_linux-arm && wget -O /usr/bin/cfssl-certinfo https://pkg.cfssl.org/R1.2/cfssl-certinfo_linux-arm && chmod +x /usr/bin/cfssl*
