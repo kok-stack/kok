@@ -17,7 +17,6 @@ limitations under the License.
 package v1
 
 import (
-	"fmt"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/validation/field"
@@ -69,23 +68,30 @@ func RegisterVersionedValidators(version string, o ClusterValidator) {
 	VersionedValidators[version] = value
 }
 
+const VersionSeparator = "-"
+
 func setMaxVersion(version string) {
 	if maxVersion == "" {
 		maxVersion = version
 		return
 	}
-	now, err := strconv.Atoi(strings.ReplaceAll(version, ".", ""))
+	split := strings.Split(version, VersionSeparator)
+	if len(split) != 2 {
+		return
+	}
+	versionNowStr := split[1]
+	now, err := strconv.Atoi(strings.ReplaceAll(versionNowStr, ".", ""))
 	if err != nil {
 		return
 	}
-	old, err := strconv.Atoi(strings.ReplaceAll(maxVersion, ".", ""))
+	versionOldStr := strings.Split(maxVersion, VersionSeparator)[1]
+	old, err := strconv.Atoi(strings.ReplaceAll(versionOldStr, ".", ""))
 	if err != nil {
 		return
 	}
 	if now > old {
 		maxVersion = version
 	}
-	fmt.Println("maxVersion:", maxVersion)
 }
 
 func RegisterVersionedDefaulters(version string, o ClusterDefaulter) {

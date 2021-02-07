@@ -4,4 +4,7 @@ resources:
 - group: cluster
   kind: Cluster
   version: v1
+- group: cluster
+  kind: ClusterPlugin
+  version: v1
 version: "2"

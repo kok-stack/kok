@@ -19,12 +19,14 @@ package main
 import (
 	"flag"
 	"fmt"
-	vs1 "github.com/kok-stack/kok/controllers/cluster1"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	_ "github.com/kok-stack/kok/controllers/cluster-arm"
+	_ "github.com/kok-stack/kok/controllers/cluster-x86"
 
 	"github.com/gin-gonic/gin"
 	v1 "k8s.io/api/core/v1"
@@ -53,7 +55,6 @@ func init() {
 
 	_ = clusterv1.AddToScheme(scheme)
 	_ = clusterv1.EtcdAddToScheme(scheme)
-	_ = vs1.Version
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -100,6 +101,15 @@ func main() {
 	}
 	if err = (&clusterv1.Cluster{}).SetupWebhookWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create webhook", "webhook", "Cluster")
+		os.Exit(1)
+	}
+	if err = (&controllers.ClusterPluginReconciler{
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("ClusterPlugin"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("Cluster"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "ClusterPlugin")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

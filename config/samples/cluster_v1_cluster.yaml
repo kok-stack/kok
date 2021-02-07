@@ -5,7 +5,7 @@ metadata:
   namespace: test
 spec:
   clusterDomain: "cluster.local"
-  clusterVersion: 1.18.4
+  clusterVersion: "x86-1.18.4"
   clusterCidr: 10.0.0.0/8
   serviceClusterIpRange: 10.96.0.0/12
   registryMirrors:

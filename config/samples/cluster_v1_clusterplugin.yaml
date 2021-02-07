@@ -1,0 +1,7 @@
+apiVersion: cluster.kok.tanx/v1
+kind: ClusterPlugin
+metadata:
+  name: clusterplugin-sample
+spec:
+  # Add fields here
+  foo: bar

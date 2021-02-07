@@ -58,6 +58,18 @@ func NewModuleContext(context context.Context, c *v1.Cluster, logger logr.Logger
 	return &ModuleContext{Context: context, Cluster: c, Logger: logger, ClusterReconciler: r}
 }
 
+type InitConfig struct {
+	Version                string
+	EtcdRepository         string
+	EtcdVersion            string
+	ApiServerImage         string
+	ControllerManagerImage string
+	SchedulerImage         string
+	ClientImage            string
+	InitImage              string
+	PodInfraContainerImage string
+}
+
 type Module struct {
 	Name  string
 	Sub   []*Module
