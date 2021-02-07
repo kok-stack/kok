@@ -70,8 +70,6 @@ type ClusterKubeProxySpec struct {
 	BindAddress string `json:"bindAddress,omitempty"`
 }
 
-//TODO: 组件 就绪/存活探针
-
 // ClusterSpec defines the desired state of Cluster
 type ClusterSpec struct {
 	ClusterDomain         string                       `json:"clusterDomain,omitempty"`

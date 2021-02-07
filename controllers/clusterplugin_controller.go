@@ -51,12 +51,10 @@ type pluginModuleContext struct {
 	*clusterv1.ClusterPlugin
 }
 
-//TODO:实现
 type ClusterPluginModule struct {
 	Name                string
 	create              func(ctx *pluginModuleContext) (*v13.Pod, error)
 	next                func(ctx *pluginModuleContext, p *v13.Pod) bool
-	delete              func()
 	updateClusterPlugin func(ctx *pluginModuleContext, p *v13.Pod)
 }
 
@@ -65,7 +63,17 @@ var modules = []*ClusterPluginModule{install, unInstall, del}
 var del = &ClusterPluginModule{
 	Name: "delete",
 	create: func(ctx *pluginModuleContext) (*v13.Pod, error) {
-		//TODO:移除这install,uninstall的pod
+		podNames := []string{ctx.ClusterPlugin.Status.InstallStatus.PodName, ctx.ClusterPlugin.Status.UninstallStatus.PodName}
+		for _, name := range podNames {
+			if err := ctx.Client.Delete(ctx.Context, &v13.Pod{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      name,
+					Namespace: ctx.ClusterPlugin.Namespace,
+				},
+			}); err != nil {
+				return nil, err
+			}
+		}
 		return nil, nil
 	},
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
@@ -80,9 +88,9 @@ var del = &ClusterPluginModule{
 
 var install = &ClusterPluginModule{
 	Name: "install",
-	create: getCreateFunc(func(ctx *pluginModuleContext) v13.PodSpec {
-		return ctx.Spec.Uninstall
-	}),
+	create: getCreateFunc(func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSpec {
+		return ctx.Spec.Install
+	}, "install"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
 		if ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
 			return true
@@ -90,6 +98,7 @@ var install = &ClusterPluginModule{
 		return false
 	},
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
+		ctx.ClusterPlugin.Status.InstallStatus.PodName = p.Name
 		ctx.ClusterPlugin.Status.InstallStatus.Status = p.Status
 		if p.Status.Phase == v13.PodSucceeded {
 			ctx.ClusterPlugin.Status.InstallStatus.Ready = true
@@ -100,9 +109,102 @@ var install = &ClusterPluginModule{
 	},
 }
 
-func getCreateFunc(f func(ctx *pluginModuleContext) v13.PodSpec) func(ctx *pluginModuleContext) (*v13.Pod, error) {
+func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
+	initContainers := make([]v13.Container, len(spec.InitContainers))
+	for i, container := range spec.InitContainers {
+		initContainers[i] = v13.Container{
+			Name:       container.Name,
+			Image:      container.Image,
+			Command:    container.Command,
+			Args:       container.Args,
+			WorkingDir: container.WorkingDir,
+			//Ports:                  ,
+			EnvFrom:        container.EnvFrom,
+			Env:            container.Env,
+			Resources:      container.Resources,
+			VolumeMounts:   container.VolumeMounts,
+			VolumeDevices:  container.VolumeDevices,
+			LivenessProbe:  container.LivenessProbe,
+			ReadinessProbe: container.ReadinessProbe,
+			StartupProbe:   container.StartupProbe,
+			Lifecycle:      container.Lifecycle,
+			//TerminationMessagePath:   ,
+			//TerminationMessagePolicy: "",
+			ImagePullPolicy: container.ImagePullPolicy,
+			SecurityContext: container.SecurityContext,
+			//Stdin:                    false,
+			//StdinOnce:                false,
+			//TTY:                      false,
+		}
+	}
+	containers := make([]v13.Container, len(spec.Containers))
+	for i, container := range spec.Containers {
+		containers[i] = v13.Container{
+			Name:       container.Name,
+			Image:      container.Image,
+			Command:    container.Command,
+			Args:       container.Args,
+			WorkingDir: container.WorkingDir,
+			//Ports:                  ,
+			EnvFrom:        container.EnvFrom,
+			Env:            container.Env,
+			Resources:      container.Resources,
+			VolumeMounts:   container.VolumeMounts,
+			VolumeDevices:  container.VolumeDevices,
+			LivenessProbe:  container.LivenessProbe,
+			ReadinessProbe: container.ReadinessProbe,
+			StartupProbe:   container.StartupProbe,
+			Lifecycle:      container.Lifecycle,
+			//TerminationMessagePath:   ,
+			//TerminationMessagePolicy: "",
+			ImagePullPolicy: container.ImagePullPolicy,
+			SecurityContext: container.SecurityContext,
+			//Stdin:                    false,
+			//StdinOnce:                false,
+			//TTY:                      false,
+		}
+	}
+	return v13.PodSpec{
+		Volumes:        spec.Volumes,
+		InitContainers: initContainers,
+		Containers:     containers,
+		//EphemeralContainers:           nil,
+		//RestartPolicy:                 ,
+		//TerminationGracePeriodSeconds: ,
+		//ActiveDeadlineSeconds:         nil,
+		//DNSPolicy:                     "",
+		//NodeSelector:                  nil,
+		ServiceAccountName: spec.ServiceAccountName,
+		//DeprecatedServiceAccount:      "",
+		//AutomountServiceAccountToken:  nil,
+		//NodeName:                      "",
+		//HostNetwork:                   false,
+		//HostPID:                       false,
+		//HostIPC:                       false,
+		//ShareProcessNamespace:         nil,
+		//SecurityContext:               spec.,
+		ImagePullSecrets: spec.ImagePullSecrets,
+		Hostname:         spec.Hostname,
+		//Subdomain:                     "",
+		//Affinity:                      nil,
+		//SchedulerName:                 "",
+		//Tolerations:                   nil,
+		//HostAliases:                   ,
+		//PriorityClassName:             "",
+		//Priority:                      nil,
+		//DNSConfig:                     nil,
+		//ReadinessGates:                nil,
+		RuntimeClassName: spec.RuntimeClassName,
+		//EnableServiceLinks:            nil,
+		//PreemptionPolicy:              nil,
+		//Overhead:                      nil,
+		//TopologySpreadConstraints:     nil,
+	}
+}
+
+func getCreateFunc(f func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSpec, moduleName string) func(ctx *pluginModuleContext) (*v13.Pod, error) {
 	return func(ctx *pluginModuleContext) (*v13.Pod, error) {
-		name := getPodName(ctx.ClusterPlugin, "unInstall")
+		name := getPodName(ctx.ClusterPlugin, moduleName)
 		p := &v13.Pod{}
 		namespace := ctx.ClusterPlugin.Namespace
 		err := ctx.Get(ctx, types.NamespacedName{
@@ -118,7 +220,7 @@ func getCreateFunc(f func(ctx *pluginModuleContext) v13.PodSpec) func(ctx *plugi
 						"cluster": ctx.Spec.ClusterName,
 					},
 				},
-				Spec: f(ctx),
+				Spec: convertSpec(f(ctx)),
 			}
 			if err := controllerutil.SetControllerReference(ctx.ClusterPlugin, pod, ctx.ClusterPluginReconciler.Scheme); err != nil {
 				ctx.Info("set pod owner error", "error", err)
@@ -127,6 +229,7 @@ func getCreateFunc(f func(ctx *pluginModuleContext) v13.PodSpec) func(ctx *plugi
 				ctx.Info("create pod error", "error", err)
 				return nil, err
 			}
+			ctx.Recorder.Event(ctx.ClusterPlugin, v13.EventTypeNormal, "CreatePod", fmt.Sprintf("Pod %s created", name))
 			return pod, nil
 		}
 		return p, err
@@ -135,9 +238,9 @@ func getCreateFunc(f func(ctx *pluginModuleContext) v13.PodSpec) func(ctx *plugi
 
 var unInstall = &ClusterPluginModule{
 	Name: "unInstall",
-	create: getCreateFunc(func(ctx *pluginModuleContext) v13.PodSpec {
+	create: getCreateFunc(func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSpec {
 		return ctx.Spec.Uninstall
-	}),
+	}, "unInstall"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
 		if ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
 			return true
@@ -145,6 +248,7 @@ var unInstall = &ClusterPluginModule{
 		return false
 	},
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
+		ctx.ClusterPlugin.Status.UninstallStatus.PodName = p.Name
 		ctx.ClusterPlugin.Status.UninstallStatus.Status = p.Status
 		if p.Status.Phase == v13.PodSucceeded {
 			ctx.ClusterPlugin.Status.UninstallStatus.Ready = true
@@ -158,7 +262,7 @@ var unInstall = &ClusterPluginModule{
 func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	namespace := req.Namespace
-	log := r.Log.WithValues("clusterplugin", req.NamespacedName)
+	log := r.Log.WithValues("cluster_plugin", req.NamespacedName)
 
 	cp := &clusterv1.ClusterPlugin{}
 	err := r.Client.Get(ctx, req.NamespacedName, cp)
@@ -181,14 +285,16 @@ func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	}
 	//install,uninstall,delete
 	//create,next,updateCP
+	total := len(modules)
 	for i, module := range modules {
-		fmt.Println(i, module)
+		modStr := fmt.Sprintf("[%v/%v]%s ", i+1, total, module.Name)
 		p, err := module.create(pmCtx)
 		if err != nil {
-			log.Info("create Cluster Plugin pod error", "error", err)
+			log.Info(modStr+"create Cluster Plugin Pod error", "error", err)
 			return ctrl.Result{}, err
 		}
 		module.updateClusterPlugin(pmCtx, p)
+		log.Info(modStr + "updated Cluster Plugin")
 		if !module.next(pmCtx, p) {
 			break
 		}

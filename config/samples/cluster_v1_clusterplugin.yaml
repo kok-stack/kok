@@ -3,5 +3,3 @@ kind: ClusterPlugin
 metadata:
   name: clusterplugin-sample
 spec:
-  # Add fields here
-  foo: bar

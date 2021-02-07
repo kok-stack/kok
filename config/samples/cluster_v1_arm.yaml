@@ -5,7 +5,7 @@ metadata:
   namespace: test
 spec:
   clusterDomain: "cluster.local"
-  clusterVersion: 1.18.4
+  clusterVersion: "arm-1.18.1"
   clusterCidr: 10.0.0.0/8
   serviceClusterIpRange: 10.96.0.0/12
   registryMirrors:
@@ -15,20 +15,20 @@ spec:
     address: "127.0.0.1"
     port: "9999"
   init:
-    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1-arm
+    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1-arm64
   etcd:
-    count: 3
+    count: 1
   apiServer:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.1
   controllerManager:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.1
   scheduler:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.1
   client:
-    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1-arm
+    image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1-arm64
   kubelet:
     podInfraContainerImage: registry.aliyuncs.com/google_containers/pause:3.2
   kubeProxy:

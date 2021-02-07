@@ -24,22 +24,87 @@ import (
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
+type ClusterPluginPodContainer struct {
+	Name string `json:"name" protobuf:"bytes,1,opt,name=name"`
+	// +optional
+	Image string `json:"image,omitempty" protobuf:"bytes,2,opt,name=image"`
+	// +optional
+	Command []string `json:"command,omitempty" protobuf:"bytes,3,rep,name=command"`
+	// +optional
+	Args []string `json:"args,omitempty" protobuf:"bytes,4,rep,name=args"`
+	// +optional
+	WorkingDir string `json:"workingDir,omitempty" protobuf:"bytes,5,opt,name=workingDir"`
+	// +optional
+	EnvFrom []v1.EnvFromSource `json:"envFrom,omitempty" protobuf:"bytes,19,rep,name=envFrom"`
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Env []v1.EnvVar `json:"env,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,7,rep,name=env"`
+	// +optional
+	Resources v1.ResourceRequirements `json:"resources,omitempty" protobuf:"bytes,8,opt,name=resources"`
+	// +optional
+	// +patchMergeKey=mountPath
+	// +patchStrategy=merge
+	VolumeMounts []v1.VolumeMount `json:"volumeMounts,omitempty" patchStrategy:"merge" patchMergeKey:"mountPath" protobuf:"bytes,9,rep,name=volumeMounts"`
+	// +patchMergeKey=devicePath
+	// +patchStrategy=merge
+	// +optional
+	VolumeDevices []v1.VolumeDevice `json:"volumeDevices,omitempty" patchStrategy:"merge" patchMergeKey:"devicePath" protobuf:"bytes,21,rep,name=volumeDevices"`
+	// +optional
+	LivenessProbe *v1.Probe `json:"livenessProbe,omitempty" protobuf:"bytes,10,opt,name=livenessProbe"`
+	// +optional
+	ReadinessProbe *v1.Probe `json:"readinessProbe,omitempty" protobuf:"bytes,11,opt,name=readinessProbe"`
+	// +optional
+	StartupProbe *v1.Probe `json:"startupProbe,omitempty" protobuf:"bytes,22,opt,name=startupProbe"`
+	// +optional
+	Lifecycle *v1.Lifecycle `json:"lifecycle,omitempty" protobuf:"bytes,12,opt,name=lifecycle"`
+	// +optional
+	ImagePullPolicy v1.PullPolicy `json:"imagePullPolicy,omitempty" protobuf:"bytes,14,opt,name=imagePullPolicy,casttype=PullPolicy"`
+	// +optional
+	SecurityContext *v1.SecurityContext `json:"securityContext,omitempty" protobuf:"bytes,15,opt,name=securityContext"`
+}
+
+type ClusterPluginPodSpec struct {
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge,retainKeys
+	Volumes []v1.Volume `json:"volumes,omitempty" patchStrategy:"merge,retainKeys" patchMergeKey:"name" protobuf:"bytes,1,rep,name=volumes"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	InitContainers []ClusterPluginPodContainer `json:"initContainers,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,20,rep,name=initContainers"`
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	Containers []ClusterPluginPodContainer `json:"containers" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,2,rep,name=containers"`
+
+	// +optional
+	ServiceAccountName string `json:"serviceAccountName,omitempty" protobuf:"bytes,8,opt,name=serviceAccountName"`
+	// +optional
+	// +patchMergeKey=name
+	// +patchStrategy=merge
+	ImagePullSecrets []v1.LocalObjectReference `json:"imagePullSecrets,omitempty" patchStrategy:"merge" patchMergeKey:"name" protobuf:"bytes,15,rep,name=imagePullSecrets"`
+	// +optional
+	Hostname string `json:"hostname,omitempty" protobuf:"bytes,16,opt,name=hostname"`
+	// +optional
+	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
+}
+
 // ClusterPluginSpec defines the desired state of ClusterPlugin
 type ClusterPluginSpec struct {
-	ClusterName string     `json:"cluster_name"`
-	Install     v1.PodSpec `json:"install"`
-	Uninstall   v1.PodSpec `json:"uninstall"`
+	ClusterName string               `json:"cluster_name"`
+	Install     ClusterPluginPodSpec `json:"install,omitempty"`
+	Uninstall   ClusterPluginPodSpec `json:"uninstall,omitempty"`
 }
 
 type ClusterPluginPodStatus struct {
-	Ready  bool         `json:"ready"`
-	Status v1.PodStatus `json:"status"`
+	PodName string       `json:"pod_name,omitempty"`
+	Ready   bool         `json:"ready,omitempty"`
+	Status  v1.PodStatus `json:"status,omitempty"`
 }
 
 // ClusterPluginStatus defines the observed state of ClusterPlugin
 type ClusterPluginStatus struct {
-	InstallStatus   ClusterPluginPodStatus `json:"install_status"`
-	UninstallStatus ClusterPluginPodStatus `json:"uninstall_status"`
+	InstallStatus   ClusterPluginPodStatus `json:"install_status,omitempty"`
+	UninstallStatus ClusterPluginPodStatus `json:"uninstall_status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
