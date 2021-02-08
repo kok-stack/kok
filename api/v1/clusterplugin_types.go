@@ -96,9 +96,9 @@ type ClusterPluginSpec struct {
 }
 
 type ClusterPluginPodStatus struct {
-	PodName string       `json:"pod_name,omitempty"`
-	Ready   bool         `json:"ready,omitempty"`
-	Status  v1.PodStatus `json:"status,omitempty"`
+	PodName string      `json:"pod_name,omitempty"`
+	Ready   bool        `json:"ready,omitempty"`
+	Status  v1.PodPhase `json:"status,omitempty"`
 }
 
 // ClusterPluginStatus defines the observed state of ClusterPlugin

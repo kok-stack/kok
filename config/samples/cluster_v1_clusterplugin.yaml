@@ -1,5 +1,19 @@
 apiVersion: cluster.kok.tanx/v1
 kind: ClusterPlugin
 metadata:
-  name: clusterplugin-sample
+  name: test
+  namespace: test
 spec:
+  cluster_name: test
+  install:
+    containers:
+      - command:
+          - date
+        image: ubuntu:latest
+        name: test
+  uninstall:
+    containers:
+      - command:
+          - date
+        image: ubuntu:latest
+        name: test

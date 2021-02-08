@@ -49,6 +49,7 @@ type pluginModuleContext struct {
 	context.Context
 	logr.Logger
 	*clusterv1.ClusterPlugin
+	*clusterv1.Cluster
 }
 
 type ClusterPluginModule struct {
@@ -89,17 +90,17 @@ var del = &ClusterPluginModule{
 var install = &ClusterPluginModule{
 	Name: "install",
 	create: getCreateFunc(func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSpec {
-		return ctx.Spec.Install
+		return ctx.ClusterPlugin.Spec.Install
 	}, "install"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
-		if ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
 			return true
 		}
 		return false
 	},
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
 		ctx.ClusterPlugin.Status.InstallStatus.PodName = p.Name
-		ctx.ClusterPlugin.Status.InstallStatus.Status = p.Status
+		ctx.ClusterPlugin.Status.InstallStatus.Status = p.Status.Phase
 		if p.Status.Phase == v13.PodSucceeded {
 			ctx.ClusterPlugin.Status.InstallStatus.Ready = true
 		}
@@ -109,9 +110,28 @@ var install = &ClusterPluginModule{
 	},
 }
 
+const mountPath = "/etc/cluster/"
+
 func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
+	mount := []v13.VolumeMount{
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: mountPath,
+		},
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: "/root/.kube/",
+		},
+	}
 	initContainers := make([]v13.Container, len(spec.InitContainers))
 	for i, container := range spec.InitContainers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
 		initContainers[i] = v13.Container{
 			Name:       container.Name,
 			Image:      container.Image,
@@ -139,6 +159,11 @@ func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
 	}
 	containers := make([]v13.Container, len(spec.Containers))
 	for i, container := range spec.Containers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
 		containers[i] = v13.Container{
 			Name:       container.Name,
 			Image:      container.Image,
@@ -169,7 +194,7 @@ func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
 		InitContainers: initContainers,
 		Containers:     containers,
 		//EphemeralContainers:           nil,
-		//RestartPolicy:                 ,
+		RestartPolicy: v13.RestartPolicyNever,
 		//TerminationGracePeriodSeconds: ,
 		//ActiveDeadlineSeconds:         nil,
 		//DNSPolicy:                     "",
@@ -212,15 +237,17 @@ func getCreateFunc(f func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSp
 			Name:      name,
 		}, p)
 		if err != nil && errors.IsNotFound(err) {
+			spec := convertSpec(f(ctx))
+			spec = addVolume(ctx, spec)
 			pod := &v13.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
 					Namespace: namespace,
 					Labels: map[string]string{
-						"cluster": ctx.Spec.ClusterName,
+						"cluster": ctx.ClusterPlugin.Spec.ClusterName,
 					},
 				},
-				Spec: convertSpec(f(ctx)),
+				Spec: spec,
 			}
 			if err := controllerutil.SetControllerReference(ctx.ClusterPlugin, pod, ctx.ClusterPluginReconciler.Scheme); err != nil {
 				ctx.Info("set pod owner error", "error", err)
@@ -236,20 +263,42 @@ func getCreateFunc(f func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSp
 	}
 }
 
+func addVolume(ctx *pluginModuleContext, spec v13.PodSpec) v13.PodSpec {
+	volume := v13.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v13.VolumeSource{
+			Secret: &v13.SecretVolumeSource{
+				SecretName: ctx.Cluster.Status.Init.AdminConfigName,
+				Items: []v13.KeyToPath{
+					{
+						Key:  "admin.config",
+						Path: "config",
+					},
+				},
+			},
+		},
+	}
+	if len(spec.Volumes) == 0 {
+		spec.Volumes = []v13.Volume{volume}
+	} else {
+		spec.Volumes = append(spec.Volumes, volume)
+	}
+	return spec
+}
+
+//TODO:覆盖卸载失败的场景
+
 var unInstall = &ClusterPluginModule{
 	Name: "unInstall",
 	create: getCreateFunc(func(ctx *pluginModuleContext) clusterv1.ClusterPluginPodSpec {
-		return ctx.Spec.Uninstall
-	}, "unInstall"),
+		return ctx.ClusterPlugin.Spec.Uninstall
+	}, "uninstall"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
-		if ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
-			return true
-		}
-		return false
+		return ctx.ClusterPlugin.Status.UninstallStatus.Ready
 	},
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
 		ctx.ClusterPlugin.Status.UninstallStatus.PodName = p.Name
-		ctx.ClusterPlugin.Status.UninstallStatus.Status = p.Status
+		ctx.ClusterPlugin.Status.UninstallStatus.Status = p.Status.Phase
 		if p.Status.Phase == v13.PodSucceeded {
 			ctx.ClusterPlugin.Status.UninstallStatus.Ready = true
 		}
@@ -282,6 +331,7 @@ func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		ctx,
 		log,
 		cp,
+		cluster,
 	}
 	//install,uninstall,delete
 	//create,next,updateCP

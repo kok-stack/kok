@@ -17,15 +17,15 @@ spec:
   init:
     image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1
   etcd:
-    count: 3
+    count: 1
   apiServer:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-apiserver:v1.18.4
   controllerManager:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-controller-manager:v1.18.4
   scheduler:
-    count: 3
+    count: 1
     image: registry.aliyuncs.com/google_containers/kube-scheduler:v1.18.4
   client:
     image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1
