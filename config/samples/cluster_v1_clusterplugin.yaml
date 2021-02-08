@@ -4,16 +4,18 @@ metadata:
   name: test
   namespace: test
 spec:
-  cluster_name: test
+  clusterName: test
   install:
     containers:
       - command:
-          - date
+          - 'cat'
+          - '/root/.kube/config'
         image: ubuntu:latest
         name: test
   uninstall:
     containers:
       - command:
-          - date
+          - cat
+          - /etc/cluster/config
         image: ubuntu:latest
         name: test

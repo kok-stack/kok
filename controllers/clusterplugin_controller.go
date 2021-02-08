@@ -93,7 +93,9 @@ var install = &ClusterPluginModule{
 		return ctx.ClusterPlugin.Spec.Install
 	}, "install"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
-		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() {
+		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() &&
+			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodPending &&
+			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodRunning {
 			return true
 		}
 		return false
@@ -101,9 +103,6 @@ var install = &ClusterPluginModule{
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
 		ctx.ClusterPlugin.Status.InstallStatus.PodName = p.Name
 		ctx.ClusterPlugin.Status.InstallStatus.Status = p.Status.Phase
-		if p.Status.Phase == v13.PodSucceeded {
-			ctx.ClusterPlugin.Status.InstallStatus.Ready = true
-		}
 		if len(ctx.ClusterPlugin.Finalizers) == 0 {
 			ctx.ClusterPlugin.Finalizers = []string{ClusterPluginFinalizerName}
 		}
@@ -294,14 +293,16 @@ var unInstall = &ClusterPluginModule{
 		return ctx.ClusterPlugin.Spec.Uninstall
 	}, "uninstall"),
 	next: func(ctx *pluginModuleContext, p *v13.Pod) bool {
-		return ctx.ClusterPlugin.Status.UninstallStatus.Ready
+		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() &&
+			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodPending &&
+			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodRunning {
+			return true
+		}
+		return false
 	},
 	updateClusterPlugin: func(ctx *pluginModuleContext, p *v13.Pod) {
 		ctx.ClusterPlugin.Status.UninstallStatus.PodName = p.Name
 		ctx.ClusterPlugin.Status.UninstallStatus.Status = p.Status.Phase
-		if p.Status.Phase == v13.PodSucceeded {
-			ctx.ClusterPlugin.Status.UninstallStatus.Ready = true
-		}
 	},
 }
 

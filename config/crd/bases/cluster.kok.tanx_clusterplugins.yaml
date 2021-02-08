@@ -9,23 +9,23 @@ metadata:
   name: clusterplugins.cluster.kok.tanx
 spec:
   additionalPrinterColumns:
-  - JSONPath: .spec.cluster_name
+  - JSONPath: .spec.clusterName
     description: cluster_name
     name: cluster
     type: string
-  - JSONPath: .spec.install.containers.image
-    description: install-image
-    name: install-image
+  - JSONPath: .status.installStatus.podName
+    description: install-pod_name
+    name: install-pod
     type: string
-  - JSONPath: .status.install_status.ready
+  - JSONPath: .status.installStatus.status
     description: install-ready
     name: install-ready
     type: string
-  - JSONPath: .spec.uninstall.containers.image
-    description: uninstall-image
-    name: uninstall-image
+  - JSONPath: .status.installStatus.podName
+    description: uninstall-pod_name
+    name: uninstall-pod
     type: string
-  - JSONPath: .status.uninstall_status.ready
+  - JSONPath: .status.uninstallStatus.status
     description: uninstall-ready
     name: uninstall-ready
     type: string
@@ -56,7 +56,7 @@ spec:
         spec:
           description: ClusterPluginSpec defines the desired state of ClusterPlugin
           properties:
-            cluster_name:
+            clusterName:
               type: string
             install:
               properties:
@@ -6323,28 +6323,24 @@ spec:
               - containers
               type: object
           required:
-          - cluster_name
+          - clusterName
           type: object
         status:
           description: ClusterPluginStatus defines the observed state of ClusterPlugin
           properties:
-            install_status:
+            installStatus:
               properties:
-                pod_name:
+                podName:
                   type: string
-                ready:
-                  type: boolean
                 status:
                   description: PodPhase is a label for the condition of a pod at the
                     current time.
                   type: string
               type: object
-            uninstall_status:
+            uninstallStatus:
               properties:
-                pod_name:
+                podName:
                   type: string
-                ready:
-                  type: boolean
                 status:
                   description: PodPhase is a label for the condition of a pod at the
                     current time.

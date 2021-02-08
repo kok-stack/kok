@@ -90,29 +90,28 @@ type ClusterPluginPodSpec struct {
 
 // ClusterPluginSpec defines the desired state of ClusterPlugin
 type ClusterPluginSpec struct {
-	ClusterName string               `json:"cluster_name"`
+	ClusterName string               `json:"clusterName"`
 	Install     ClusterPluginPodSpec `json:"install,omitempty"`
 	Uninstall   ClusterPluginPodSpec `json:"uninstall,omitempty"`
 }
 
 type ClusterPluginPodStatus struct {
-	PodName string      `json:"pod_name,omitempty"`
-	Ready   bool        `json:"ready,omitempty"`
+	PodName string      `json:"podName,omitempty"`
 	Status  v1.PodPhase `json:"status,omitempty"`
 }
 
 // ClusterPluginStatus defines the observed state of ClusterPlugin
 type ClusterPluginStatus struct {
-	InstallStatus   ClusterPluginPodStatus `json:"install_status,omitempty"`
-	UninstallStatus ClusterPluginPodStatus `json:"uninstall_status,omitempty"`
+	InstallStatus   ClusterPluginPodStatus `json:"installStatus,omitempty"`
+	UninstallStatus ClusterPluginPodStatus `json:"uninstallStatus,omitempty"`
 }
 
 // +kubebuilder:object:root=true
-// +kubebuilder:printcolumn:name="cluster",type="string",JSONPath=".spec.cluster_name",description="cluster_name"
-// +kubebuilder:printcolumn:name="install-image",type="string",JSONPath=".spec.install.containers.image",description="install-image"
-// +kubebuilder:printcolumn:name="install-ready",type="string",JSONPath=".status.install_status.ready",description="install-ready"
-// +kubebuilder:printcolumn:name="uninstall-image",type="string",JSONPath=".spec.uninstall.containers.image",description="uninstall-image"
-// +kubebuilder:printcolumn:name="uninstall-ready",type="string",JSONPath=".status.uninstall_status.ready",description="uninstall-ready"
+// +kubebuilder:printcolumn:name="cluster",type="string",JSONPath=".spec.clusterName",description="cluster_name"
+// +kubebuilder:printcolumn:name="install-pod",type="string",JSONPath=".status.installStatus.podName",description="install-pod_name"
+// +kubebuilder:printcolumn:name="install-ready",type="string",JSONPath=".status.installStatus.status",description="install-ready"
+// +kubebuilder:printcolumn:name="uninstall-pod",type="string",JSONPath=".status.installStatus.podName",description="uninstall-pod_name"
+// +kubebuilder:printcolumn:name="uninstall-ready",type="string",JSONPath=".status.uninstallStatus.status",description="uninstall-ready"
 
 // ClusterPlugin is the Schema for the clusterplugins API
 type ClusterPlugin struct {
