@@ -1,0 +1,20 @@
+# permissions for end users to view multiclusterplugins.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multiclusterplugin-viewer-role
+rules:
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins/status
+  verbs:
+  - get

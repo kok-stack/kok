@@ -1,0 +1,24 @@
+# permissions for end users to edit multiclusterplugins.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: multiclusterplugin-editor-role
+rules:
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins/status
+  verbs:
+  - get

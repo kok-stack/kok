@@ -88,11 +88,15 @@ type ClusterPluginPodSpec struct {
 	RuntimeClassName *string `json:"runtimeClassName,omitempty" protobuf:"bytes,29,opt,name=runtimeClassName"`
 }
 
+type CLusterPluginSpecInner struct {
+	Install   ClusterPluginPodSpec `json:"install,omitempty"`
+	Uninstall ClusterPluginPodSpec `json:"uninstall,omitempty"`
+}
+
 // ClusterPluginSpec defines the desired state of ClusterPlugin
 type ClusterPluginSpec struct {
-	ClusterName string               `json:"clusterName"`
-	Install     ClusterPluginPodSpec `json:"install,omitempty"`
-	Uninstall   ClusterPluginPodSpec `json:"uninstall,omitempty"`
+	CLusterPluginSpecInner `json:",inline"`
+	ClusterName            string `json:"clusterName"`
 }
 
 type ClusterPluginPodStatus struct {

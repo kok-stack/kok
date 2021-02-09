@@ -1,0 +1,7 @@
+apiVersion: cluster.kok.tanx/v1
+kind: MultiClusterPlugin
+metadata:
+  name: multiclusterplugin-sample
+spec:
+  # Add fields here
+  foo: bar

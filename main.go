@@ -112,6 +112,15 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterPlugin")
 		os.Exit(1)
 	}
+	if err = (&controllers.MultiClusterPluginReconciler{
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("MultiClusterPlugin"),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("Cluster"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "MultiClusterPlugin")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	go startAddonsDownloader(mgr)
