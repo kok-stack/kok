@@ -18,8 +18,11 @@ package controllers
 
 import (
 	"context"
+	"fmt"
+	v13 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"path"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -71,8 +74,64 @@ func (r *MultiClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		Context:          ctx,
 		ClusterPluginObj: cp,
 		Clusters:         clusters,
+		AddVolumes:       multiClusterPluginAddVolumes,
 	}
-	return reconcile(pmCtx, cp)
+	return reconcile(pmCtx)
+}
+
+func multiClusterPluginAddVolumes(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodSpec {
+	plugin := ctx.ClusterPluginObj.(*clusterv1.MultiClusterPlugin)
+	cs := ctx.Clusters
+	clusters := plugin.Spec.Clusters
+
+	mount := []v13.VolumeMount{
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: MountPath,
+		},
+	}
+	for _, container := range spec.InitContainers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
+	}
+	for _, container := range spec.Containers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
+	}
+
+	volumes := make([]v13.Volume, len(clusters))
+	for i, cluster := range clusters {
+		fmt.Println(cluster)
+		volume := v13.Volume{
+			Name: "kubeconfig",
+			VolumeSource: v13.VolumeSource{
+				Secret: &v13.SecretVolumeSource{
+					SecretName: cs[i].Status.Init.AdminConfigName,
+					Items: []v13.KeyToPath{
+						{
+							Key:  "admin.config",
+							Path: path.Join(cluster, "config"),
+						},
+					},
+				},
+			},
+		}
+		volumes[i] = volume
+	}
+
+	if len(spec.Volumes) == 0 {
+		spec.Volumes = volumes
+	} else {
+		spec.Volumes = append(spec.Volumes, volumes...)
+	}
+	return spec
 }
 
 func (r *MultiClusterPluginReconciler) SetupWithManager(mgr ctrl.Manager) error {

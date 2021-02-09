@@ -53,7 +53,8 @@ type PluginModuleContext struct {
 	context.Context
 	clusterv1.ClusterPluginObj
 	*clusterv1.Cluster
-	Clusters []*clusterv1.Cluster
+	Clusters   []*clusterv1.Cluster
+	AddVolumes func(*PluginModuleContext, v13.PodSpec) v13.PodSpec
 }
 
 type ClusterPluginModule struct {
@@ -221,7 +222,7 @@ func getCreateFunc(f func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSp
 		}, p)
 		if err != nil && errors.IsNotFound(err) {
 			spec := convertSpec(f(ctx))
-			spec = AddVolumeFunc(ctx, spec)
+			spec = ctx.AddVolumes(ctx, spec)
 			pod := &v13.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
@@ -245,9 +246,6 @@ func getCreateFunc(f func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSp
 		return p, err
 	}
 }
-
-//TODO: 考虑此处移动到各自的plugin中,并通过变量传递
-var AddVolumeFunc func(*PluginModuleContext, v13.PodSpec) v13.PodSpec
 
 //TODO:覆盖卸载失败的场景
 
@@ -302,11 +300,62 @@ func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 		ClusterPluginObj: cp,
 		Cluster:          cluster,
 		Clusters:         nil,
+		AddVolumes:       clusterPluginAddVolume,
 	}
-	return reconcile(pmCtx, cp)
+	return reconcile(pmCtx)
 }
 
-func reconcile(pmCtx *PluginModuleContext, cp clusterv1.ClusterPluginObj) (ctrl.Result, error) {
+func clusterPluginAddVolume(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodSpec {
+	mount := []v13.VolumeMount{
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: MountPath,
+		},
+		{
+			Name:      "kubeconfig",
+			ReadOnly:  true,
+			MountPath: "/root/.kube/",
+		},
+	}
+	for _, container := range spec.InitContainers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
+	}
+	for _, container := range spec.Containers {
+		if len(container.VolumeMounts) > 0 {
+			container.VolumeMounts = append(container.VolumeMounts, mount...)
+		} else {
+			container.VolumeMounts = mount
+		}
+	}
+
+	volume := v13.Volume{
+		Name: "kubeconfig",
+		VolumeSource: v13.VolumeSource{
+			Secret: &v13.SecretVolumeSource{
+				SecretName: ctx.Cluster.Status.Init.AdminConfigName,
+				Items: []v13.KeyToPath{
+					{
+						Key:  "admin.config",
+						Path: "config",
+					},
+				},
+			},
+		},
+	}
+	if len(spec.Volumes) == 0 {
+		spec.Volumes = []v13.Volume{volume}
+	} else {
+		spec.Volumes = append(spec.Volumes, volume)
+	}
+	return spec
+}
+
+func reconcile(pmCtx *PluginModuleContext) (ctrl.Result, error) {
 	//install,uninstall,delete
 	//create,next,updateCP
 	total := len(modules)
@@ -323,11 +372,12 @@ func reconcile(pmCtx *PluginModuleContext, cp clusterv1.ClusterPluginObj) (ctrl.
 			break
 		}
 	}
-	if err := pmCtx.Client.Update(pmCtx.Context, cp); err != nil {
+	if err := pmCtx.Client.Update(pmCtx.Context, pmCtx.ClusterPluginObj); err != nil {
 		pmCtx.Info("update Cluster Plugin error", "error", err)
 		return ctrl.Result{}, err
 	}
-	pmCtx.Info("update Cluster Plugin finish", "name", cp.GetName(), "namespace", cp.GetNamespace(), "cluster", cp.GetClusterNames())
+	pmCtx.Info("update Cluster Plugin finish", "name", pmCtx.ClusterPluginObj.GetName(),
+		"namespace", pmCtx.ClusterPluginObj.GetNamespace(), "cluster", pmCtx.ClusterPluginObj.GetClusterNames())
 
 	return ctrl.Result{}, nil
 }
