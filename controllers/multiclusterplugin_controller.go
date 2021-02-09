@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 
 	"github.com/go-logr/logr"
@@ -41,8 +42,8 @@ type MultiClusterPluginReconciler struct {
 
 func (r *MultiClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
-	//namespace := req.Namespace
-	//log := r.Log.WithValues("cluster_plugin", req.NamespacedName)
+	namespace := req.Namespace
+	log := r.Log.WithValues("multi_cluster_plugin", req.NamespacedName)
 
 	cp := &clusterv1.MultiClusterPlugin{}
 	err := r.Client.Get(ctx, req.NamespacedName, cp)
@@ -50,26 +51,28 @@ func (r *MultiClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	//cluster := &clusterv1.Cluster{}
-	//if err := r.Client.Get(ctx, types.NamespacedName{
-	//	Namespace: namespace,
-	//	Name:      cp.Spec.ClusterName,
-	//}, cluster); err != nil {
-	//	return ctrl.Result{}, err
-	//}
-	//
-	//pmCtx := &PluginModuleContext{
-	//	Client:        r.Client,
-	//	Logger:        log,
-	//	Scheme:        r.Scheme,
-	//	EventRecorder: r.Recorder,
-	//	Context:       ctx,
-	//	ClusterPlugin: cp,
-	//	Cluster:       cluster,
-	//	Clusters:      nil,
-	//}
-	//return reconcile(pmCtx, cp)
-	return ctrl.Result{}, nil
+	clusters := make([]*clusterv1.Cluster, len(cp.Spec.Clusters))
+	for i, name := range cp.Spec.Clusters {
+		cluster := &clusterv1.Cluster{}
+		if err := r.Client.Get(ctx, types.NamespacedName{
+			Namespace: namespace,
+			Name:      name,
+		}, cluster); err != nil {
+			return ctrl.Result{}, err
+		}
+		clusters[i] = cluster
+	}
+
+	pmCtx := &PluginModuleContext{
+		Client:           r.Client,
+		Logger:           log,
+		Scheme:           r.Scheme,
+		EventRecorder:    r.Recorder,
+		Context:          ctx,
+		ClusterPluginObj: cp,
+		Clusters:         clusters,
+	}
+	return reconcile(pmCtx, cp)
 }
 
 func (r *MultiClusterPluginReconciler) SetupWithManager(mgr ctrl.Manager) error {

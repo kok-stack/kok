@@ -26,3 +26,23 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cluster.kok.tanx
+  resources:
+  - multiclusterplugins/status
+  verbs:
+  - get
+  - patch
+  - update

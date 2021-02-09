@@ -110,6 +110,22 @@ type ClusterPluginStatus struct {
 	UninstallStatus ClusterPluginPodStatus `json:"uninstallStatus,omitempty"`
 }
 
+func (in *ClusterPlugin) GetSpec() CLusterPluginSpecInner {
+	return in.Spec.CLusterPluginSpecInner
+}
+
+func (in *ClusterPlugin) GetStatus() ClusterPluginStatus {
+	return in.Status
+}
+
+func (in *ClusterPlugin) GetClusterNames() string {
+	return in.Spec.ClusterName
+}
+
+func (in *ClusterPlugin) UpdateStatus(target ClusterPluginStatus) {
+	in.Status = target
+}
+
 // +kubebuilder:object:root=true
 // +kubebuilder:printcolumn:name="cluster",type="string",JSONPath=".spec.clusterName",description="cluster_name"
 // +kubebuilder:printcolumn:name="install-pod",type="string",JSONPath=".status.installStatus.podName",description="install-pod_name"

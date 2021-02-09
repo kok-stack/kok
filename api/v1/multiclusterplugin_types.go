@@ -18,6 +18,8 @@ package v1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"strings"
 )
 
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
@@ -29,6 +31,18 @@ type MultiClusterPluginSpec struct {
 	CLusterPluginSpecInner `json:",inline"`
 }
 
+// +kubebuilder:object:generate=false
+
+type ClusterPluginObj interface {
+	metav1.Object
+	runtime.Object
+
+	GetSpec() CLusterPluginSpecInner
+	GetStatus() ClusterPluginStatus
+	GetClusterNames() string
+	UpdateStatus(ClusterPluginStatus)
+}
+
 // +kubebuilder:object:root=true
 
 // MultiClusterPlugin is the Schema for the multiclusterplugins API
@@ -37,7 +51,23 @@ type MultiClusterPlugin struct {
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	Spec   MultiClusterPluginSpec `json:"spec,omitempty"`
-	Status ClusterPluginPodStatus `json:"status,omitempty"`
+	Status ClusterPluginStatus    `json:"status,omitempty"`
+}
+
+func (in *MultiClusterPlugin) GetSpec() CLusterPluginSpecInner {
+	return in.Spec.CLusterPluginSpecInner
+}
+
+func (in *MultiClusterPlugin) GetStatus() ClusterPluginStatus {
+	return in.Status
+}
+
+func (in *MultiClusterPlugin) GetClusterNames() string {
+	return strings.Join(in.Spec.Clusters, ",")
+}
+
+func (in *MultiClusterPlugin) UpdateStatus(target ClusterPluginStatus) {
+	in.Status = target
 }
 
 // +kubebuilder:object:root=true

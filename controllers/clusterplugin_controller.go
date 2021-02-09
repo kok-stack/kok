@@ -51,7 +51,7 @@ type PluginModuleContext struct {
 	record.EventRecorder
 
 	context.Context
-	*clusterv1.ClusterPlugin
+	clusterv1.ClusterPluginObj
 	*clusterv1.Cluster
 	Clusters []*clusterv1.Cluster
 }
@@ -68,12 +68,12 @@ var modules = []*ClusterPluginModule{install, unInstall, del}
 var del = &ClusterPluginModule{
 	Name: "delete",
 	create: func(ctx *PluginModuleContext) (*v13.Pod, error) {
-		podNames := []string{ctx.ClusterPlugin.Status.InstallStatus.PodName, ctx.ClusterPlugin.Status.UninstallStatus.PodName}
+		podNames := []string{ctx.ClusterPluginObj.GetStatus().InstallStatus.PodName, ctx.ClusterPluginObj.GetStatus().UninstallStatus.PodName}
 		for _, name := range podNames {
 			if err := ctx.Client.Delete(ctx.Context, &v13.Pod{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      name,
-					Namespace: ctx.ClusterPlugin.Namespace,
+					Namespace: ctx.ClusterPluginObj.GetNamespace(),
 				},
 			}); err != nil {
 				return nil, err
@@ -85,8 +85,8 @@ var del = &ClusterPluginModule{
 		return false
 	},
 	updateClusterPlugin: func(ctx *PluginModuleContext, p *v13.Pod) {
-		if len(ctx.ClusterPlugin.Finalizers) != 0 {
-			ctx.ClusterPlugin.Finalizers = []string{}
+		if len(ctx.ClusterPluginObj.GetFinalizers()) != 0 {
+			ctx.ClusterPluginObj.SetFinalizers([]string{})
 		}
 	},
 }
@@ -94,21 +94,23 @@ var del = &ClusterPluginModule{
 var install = &ClusterPluginModule{
 	Name: "install",
 	create: getCreateFunc(func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSpec {
-		return ctx.ClusterPlugin.Spec.Install
+		return ctx.ClusterPluginObj.GetSpec().Install
 	}, "install"),
 	next: func(ctx *PluginModuleContext, p *v13.Pod) bool {
-		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() &&
-			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodPending &&
-			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodRunning {
+		if !ctx.ClusterPluginObj.GetDeletionTimestamp().IsZero() &&
+			ctx.ClusterPluginObj.GetStatus().InstallStatus.Status != v13.PodPending &&
+			ctx.ClusterPluginObj.GetStatus().InstallStatus.Status != v13.PodRunning {
 			return true
 		}
 		return false
 	},
 	updateClusterPlugin: func(ctx *PluginModuleContext, p *v13.Pod) {
-		ctx.ClusterPlugin.Status.InstallStatus.PodName = p.Name
-		ctx.ClusterPlugin.Status.InstallStatus.Status = p.Status.Phase
-		if len(ctx.ClusterPlugin.Finalizers) == 0 {
-			ctx.ClusterPlugin.Finalizers = []string{ClusterPluginFinalizerName}
+		status := ctx.ClusterPluginObj.GetStatus()
+		status.InstallStatus.PodName = p.Name
+		status.InstallStatus.Status = p.Status.Phase
+		ctx.ClusterPluginObj.UpdateStatus(status)
+		if len(ctx.ClusterPluginObj.GetFinalizers()) == 0 {
+			ctx.ClusterPluginObj.SetFinalizers([]string{ClusterPluginFinalizerName})
 		}
 	},
 }
@@ -210,9 +212,9 @@ func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
 
 func getCreateFunc(f func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSpec, moduleName string) func(ctx *PluginModuleContext) (*v13.Pod, error) {
 	return func(ctx *PluginModuleContext) (*v13.Pod, error) {
-		name := getPodName(ctx.ClusterPlugin, moduleName)
+		name := getPodName(ctx.ClusterPluginObj, moduleName)
 		p := &v13.Pod{}
-		namespace := ctx.ClusterPlugin.Namespace
+		namespace := ctx.ClusterPluginObj.GetNamespace()
 		err := ctx.Get(ctx, types.NamespacedName{
 			Namespace: namespace,
 			Name:      name,
@@ -225,25 +227,26 @@ func getCreateFunc(f func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSp
 					Name:      name,
 					Namespace: namespace,
 					Labels: map[string]string{
-						"cluster": ctx.ClusterPlugin.Spec.ClusterName,
+						"cluster": ctx.ClusterPluginObj.GetClusterNames(),
 					},
 				},
 				Spec: spec,
 			}
-			if err := controllerutil.SetControllerReference(ctx.ClusterPlugin, pod, ctx.Scheme); err != nil {
+			if err := controllerutil.SetControllerReference(ctx.ClusterPluginObj, pod, ctx.Scheme); err != nil {
 				ctx.Info("set pod owner error", "error", err)
 			}
 			if err := ctx.Client.Create(ctx.Context, pod); err != nil {
 				ctx.Info("create pod error", "error", err)
 				return nil, err
 			}
-			ctx.Event(ctx.ClusterPlugin, v13.EventTypeNormal, "CreatePod", fmt.Sprintf("Pod %s created", name))
+			ctx.Event(ctx.ClusterPluginObj, v13.EventTypeNormal, "CreatePod", fmt.Sprintf("Pod %s created", name))
 			return pod, nil
 		}
 		return p, err
 	}
 }
 
+//TODO: 考虑此处移动到各自的plugin中,并通过变量传递
 var AddVolumeFunc func(*PluginModuleContext, v13.PodSpec) v13.PodSpec
 
 //TODO:覆盖卸载失败的场景
@@ -251,19 +254,21 @@ var AddVolumeFunc func(*PluginModuleContext, v13.PodSpec) v13.PodSpec
 var unInstall = &ClusterPluginModule{
 	Name: "unInstall",
 	create: getCreateFunc(func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSpec {
-		return ctx.ClusterPlugin.Spec.Uninstall
+		return ctx.ClusterPluginObj.GetSpec().Uninstall
 	}, "uninstall"),
 	next: func(ctx *PluginModuleContext, p *v13.Pod) bool {
-		if !ctx.ClusterPlugin.ObjectMeta.DeletionTimestamp.IsZero() &&
-			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodPending &&
-			ctx.ClusterPlugin.Status.InstallStatus.Status != v13.PodRunning {
+		if !ctx.ClusterPluginObj.GetDeletionTimestamp().IsZero() &&
+			ctx.ClusterPluginObj.GetStatus().InstallStatus.Status != v13.PodPending &&
+			ctx.ClusterPluginObj.GetStatus().InstallStatus.Status != v13.PodRunning {
 			return true
 		}
 		return false
 	},
 	updateClusterPlugin: func(ctx *PluginModuleContext, p *v13.Pod) {
-		ctx.ClusterPlugin.Status.UninstallStatus.PodName = p.Name
-		ctx.ClusterPlugin.Status.UninstallStatus.Status = p.Status.Phase
+		status := ctx.ClusterPluginObj.GetStatus()
+		status.UninstallStatus.PodName = p.Name
+		status.UninstallStatus.Status = p.Status.Phase
+		ctx.ClusterPluginObj.UpdateStatus(status)
 	},
 }
 
@@ -289,19 +294,19 @@ func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	}
 
 	pmCtx := &PluginModuleContext{
-		Client:        r.Client,
-		Logger:        log,
-		Scheme:        r.Scheme,
-		EventRecorder: r.Recorder,
-		Context:       ctx,
-		ClusterPlugin: cp,
-		Cluster:       cluster,
-		Clusters:      nil,
+		Client:           r.Client,
+		Logger:           log,
+		Scheme:           r.Scheme,
+		EventRecorder:    r.Recorder,
+		Context:          ctx,
+		ClusterPluginObj: cp,
+		Cluster:          cluster,
+		Clusters:         nil,
 	}
 	return reconcile(pmCtx, cp)
 }
 
-func reconcile(pmCtx *PluginModuleContext, cp *clusterv1.ClusterPlugin) (ctrl.Result, error) {
+func reconcile(pmCtx *PluginModuleContext, cp clusterv1.ClusterPluginObj) (ctrl.Result, error) {
 	//install,uninstall,delete
 	//create,next,updateCP
 	total := len(modules)
@@ -322,13 +327,13 @@ func reconcile(pmCtx *PluginModuleContext, cp *clusterv1.ClusterPlugin) (ctrl.Re
 		pmCtx.Info("update Cluster Plugin error", "error", err)
 		return ctrl.Result{}, err
 	}
-	pmCtx.Info("update Cluster Plugin finish", "name", cp.Name, "namespace", cp.Name, "cluster", cp.Spec.ClusterName)
+	pmCtx.Info("update Cluster Plugin finish", "name", cp.GetName(), "namespace", cp.GetNamespace(), "cluster", cp.GetClusterNames())
 
 	return ctrl.Result{}, nil
 }
 
-func getPodName(cp *clusterv1.ClusterPlugin, name string) string {
-	return fmt.Sprintf("%s-%s", cp.Name, name)
+func getPodName(cp clusterv1.ClusterPluginObj, name string) string {
+	return fmt.Sprintf("%s-%s", cp.GetName(), name)
 }
 
 func (r *ClusterPluginReconciler) SetupWithManager(mgr ctrl.Manager) error {
