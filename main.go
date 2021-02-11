@@ -19,20 +19,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-	"text/template"
-
 	_ "github.com/kok-stack/kok/controllers/cluster-arm"
 	_ "github.com/kok-stack/kok/controllers/cluster-x86"
-
-	"github.com/gin-gonic/gin"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"os"
+	"strings"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -123,138 +113,9 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	go startAddonsDownloader(mgr)
-
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
-}
-
-const addonsDirName = "addons"
-
-var version2Addons = map[string]map[string]*template.Template{}
-var defaultTemplateFuncs = template.FuncMap{"join": strings.Join}
-
-func startAddonsDownloader(mgr manager.Manager) {
-	c := mgr.GetClient()
-
-	err := initTemplateMaps()
-	if err != nil {
-		setupLog.Error(err, "load addons template error")
-	}
-	engine := gin.Default()
-	engine.Any("/download/:namespace/:name/:dir/:filename", func(ctx *gin.Context) {
-		ns := ctx.Param("namespace")
-		name := ctx.Param("name")
-		dir := ctx.Param("dir")
-		filename := ctx.Param("filename")
-
-		cls := &clusterv1.Cluster{}
-		err := c.Get(ctx, types.NamespacedName{
-			Namespace: ns,
-			Name:      name,
-		}, cls)
-		if err != nil {
-			panic(err)
-		}
-
-		t, ok := version2Addons[cls.Spec.ClusterVersion][dir]
-		if !ok {
-			if _, err := ctx.Writer.WriteString("未找到文件模板,传入的dir可能存在错误"); err != nil {
-				panic(err)
-			}
-		}
-		if err = t.ExecuteTemplate(ctx.Writer, filename, cls); err != nil {
-			panic(err)
-		}
-		ctx.Writer.Flush()
-	})
-	engine.Any("/meta/:namespace/:name/ca/:filename", func(ctx *gin.Context) {
-		getMeta(ctx, c, "ca")
-	})
-
-	engine.Any("/meta/:namespace/:name/nodeconfig/:filename", func(ctx *gin.Context) {
-		getMeta(ctx, c, "nodeconfig")
-	})
-
-	if err := engine.Run(":7788"); err != nil {
-		setupLog.Error(err, "start addons downloader error")
-	}
-}
-
-func getMeta(ctx *gin.Context, client client.Client, dir string) {
-	ns := ctx.Param("namespace")
-	name := ctx.Param("name")
-	filename := ctx.Param("filename")
-
-	cls := &clusterv1.Cluster{}
-	err := client.Get(ctx, types.NamespacedName{
-		Namespace: ns,
-		Name:      name,
-	}, cls)
-	if err != nil {
-		panic(err)
-	}
-
-	sourceName := ""
-	switch dir {
-	case "ca":
-		sourceName = cls.Status.Init.CaPkiName
-	case "nodeconfig":
-		sourceName = cls.Status.Init.NodeConfigName
-	}
-	ca := &v1.Secret{}
-	err = client.Get(ctx, types.NamespacedName{
-		Namespace: ns,
-		Name:      sourceName,
-	}, ca)
-	if err != nil {
-		panic(err)
-	}
-	b, ok := ca.Data[filename]
-	if !ok {
-		if _, err := ctx.Writer.WriteString("未找到元数据,传入的filename可能存在错误"); err != nil {
-			panic(err)
-		}
-	}
-	fmt.Printf("%s", b)
-
-	if _, err := ctx.Writer.Write(b); err != nil {
-		panic(err)
-	}
-	ctx.Writer.Flush()
-}
-
-func initTemplateMaps() error {
-	dir, err := ioutil.ReadDir(addonsDirName)
-	if err != nil {
-		return err
-	}
-	for _, sub := range dir {
-		if !sub.IsDir() {
-			continue
-		}
-		join := filepath.Join(addonsDirName, sub.Name())
-		subDir, err := ioutil.ReadDir(join)
-		if err != nil {
-			return err
-		}
-		m := map[string]*template.Template{}
-		for _, info := range subDir {
-			if !info.IsDir() {
-				continue
-			}
-			name := filepath.Join(join, info.Name())
-			t, err := template.New(name).Funcs(defaultTemplateFuncs).ParseGlob(name + "/*")
-			if err != nil {
-				return err
-			}
-			m[info.Name()] = t
-		}
-
-		version2Addons[sub.Name()] = m
-	}
-	return nil
 }
