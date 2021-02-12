@@ -8,8 +8,8 @@ import (
 func init() {
 	config := &controllers.InitConfig{
 		Version:                "arm-1.18.1",
-		EtcdRepository:         "etcd-arm64",
-		EtcdVersion:            "3.4.3-0",
+		EtcdRepository:         "quay.io/coreos/etcd",
+		EtcdVersion:            "3.2.13",
 		ApiServerImage:         "mirrorgcrio/kube-apiserver-arm64:v1.18.1",
 		ControllerManagerImage: "mirrorgcrio/kube-controller-manager-arm64:v1.18.1",
 		SchedulerImage:         "mirrorgcrio/kube-scheduler-arm64:v1.18.1",

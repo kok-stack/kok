@@ -25,6 +25,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"strings"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -54,7 +55,7 @@ type PluginModuleContext struct {
 	clusterv1.ClusterPluginObj
 	*clusterv1.Cluster
 	Clusters   []*clusterv1.Cluster
-	AddVolumes func(*PluginModuleContext, v13.PodSpec) v13.PodSpec
+	AddVolumes func(*PluginModuleContext, *v13.PodSpec) *v13.PodSpec
 }
 
 type ClusterPluginModule struct {
@@ -118,7 +119,7 @@ var install = &ClusterPluginModule{
 
 const MountPath = "/etc/cluster/"
 
-func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
+func convertSpec(spec clusterv1.ClusterPluginPodSpec) *v13.PodSpec {
 	initContainers := make([]v13.Container, len(spec.InitContainers))
 	for i, container := range spec.InitContainers {
 		initContainers[i] = v13.Container{
@@ -173,7 +174,7 @@ func convertSpec(spec clusterv1.ClusterPluginPodSpec) v13.PodSpec {
 			//TTY:                      false,
 		}
 	}
-	return v13.PodSpec{
+	return &v13.PodSpec{
 		Volumes:        spec.Volumes,
 		InitContainers: initContainers,
 		Containers:     containers,
@@ -231,7 +232,7 @@ func getCreateFunc(f func(ctx *PluginModuleContext) clusterv1.ClusterPluginPodSp
 						"cluster": ctx.ClusterPluginObj.GetClusterNames(),
 					},
 				},
-				Spec: spec,
+				Spec: *spec,
 			}
 			if err := controllerutil.SetControllerReference(ctx.ClusterPluginObj, pod, ctx.Scheme); err != nil {
 				ctx.Info("set pod owner error", "error", err)
@@ -305,7 +306,7 @@ func (r *ClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	return reconcile(pmCtx)
 }
 
-func clusterPluginAddVolume(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodSpec {
+func clusterPluginAddVolume(ctx *PluginModuleContext, spec *v13.PodSpec) *v13.PodSpec {
 	mount := []v13.VolumeMount{
 		{
 			Name:      "kubeconfig",
@@ -318,19 +319,21 @@ func clusterPluginAddVolume(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodS
 			MountPath: "/root/.kube/",
 		},
 	}
-	for _, container := range spec.InitContainers {
+	for i, container := range spec.InitContainers {
 		if len(container.VolumeMounts) > 0 {
 			container.VolumeMounts = append(container.VolumeMounts, mount...)
 		} else {
 			container.VolumeMounts = mount
 		}
+		spec.Containers[i] = container
 	}
-	for _, container := range spec.Containers {
+	for i, container := range spec.Containers {
 		if len(container.VolumeMounts) > 0 {
 			container.VolumeMounts = append(container.VolumeMounts, mount...)
 		} else {
 			container.VolumeMounts = mount
 		}
+		spec.Containers[i] = container
 	}
 
 	volume := v13.Volume{
@@ -355,6 +358,7 @@ func clusterPluginAddVolume(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodS
 	return spec
 }
 
+//TODO: 考虑集群删除时，如何处理插件
 func reconcile(pmCtx *PluginModuleContext) (ctrl.Result, error) {
 	//install,uninstall,delete
 	//create,next,updateCP
@@ -383,7 +387,8 @@ func reconcile(pmCtx *PluginModuleContext) (ctrl.Result, error) {
 }
 
 func getPodName(cp clusterv1.ClusterPluginObj, name string) string {
-	return fmt.Sprintf("%s-%s", cp.GetName(), name)
+	kind := strings.ToLower(cp.GetObjectKind().GroupVersionKind().Kind)
+	return fmt.Sprintf("%s-%s-%s", cp.GetName(), kind, name)
 }
 
 func (r *ClusterPluginReconciler) SetupWithManager(mgr ctrl.Manager) error {

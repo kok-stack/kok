@@ -79,7 +79,7 @@ func (r *MultiClusterPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result,
 	return reconcile(pmCtx)
 }
 
-func multiClusterPluginAddVolumes(ctx *PluginModuleContext, spec v13.PodSpec) v13.PodSpec {
+func multiClusterPluginAddVolumes(ctx *PluginModuleContext, spec *v13.PodSpec) *v13.PodSpec {
 	plugin := ctx.ClusterPluginObj.(*clusterv1.MultiClusterPlugin)
 	cs := ctx.Clusters
 	clusters := plugin.Spec.Clusters
@@ -91,19 +91,21 @@ func multiClusterPluginAddVolumes(ctx *PluginModuleContext, spec v13.PodSpec) v1
 			MountPath: MountPath,
 		},
 	}
-	for _, container := range spec.InitContainers {
+	for i, container := range spec.InitContainers {
 		if len(container.VolumeMounts) > 0 {
 			container.VolumeMounts = append(container.VolumeMounts, mount...)
 		} else {
 			container.VolumeMounts = mount
 		}
+		spec.Containers[i] = container
 	}
-	for _, container := range spec.Containers {
+	for i, container := range spec.Containers {
 		if len(container.VolumeMounts) > 0 {
 			container.VolumeMounts = append(container.VolumeMounts, mount...)
 		} else {
 			container.VolumeMounts = mount
 		}
+		spec.Containers[i] = container
 	}
 
 	volumes := make([]v13.Volume, len(clusters))
