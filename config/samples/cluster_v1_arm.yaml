@@ -30,6 +30,6 @@ spec:
   client:
     image: ccr.ccs.tencentyun.com/k8sonk8s/init:v1-arm64
   kubelet:
-    podInfraContainerImage: registry.aliyuncs.com/google_containers/pause:3.2
+    podInfraContainerImage: mirrorgcrio/pause-arm64:3.2
   kubeProxy:
     bindAddress: "0.0.0.0"
