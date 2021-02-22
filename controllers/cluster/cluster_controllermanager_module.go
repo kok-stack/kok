@@ -61,6 +61,8 @@ func NewControllerManagerModules(cfg *controllers.InitConfig) {
 										"--service-account-private-key-file=/pki/server/kubernetes-server-key.pem",
 										fmt.Sprintf("--service-cluster-ip-range=%s", c.Spec.ServiceClusterIpRange),
 										"--use-service-account-credentials=true",
+										//在virtual kubelet下,在loadbalance的service中排除virtual node
+										"--feature-gates=ServiceNodeExclusion=true",
 									},
 									LivenessProbe: &v1.Probe{
 										InitialDelaySeconds: 10,
